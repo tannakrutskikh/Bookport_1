@@ -216,14 +216,19 @@ async function parseAndTranslateIngredients(
     .map(ing => `${ing.fullName || ing.shortName || "ингредиент"} ${ing.weight || 100}г`)
     .join(", ");
 
-  const translationPrompt = `You are a technical translator. Parse the Russian ingredient list and output a raw JSON array of objects. Each object must have: 'foodName' (translated to English, e.g. 'buckwheat'), and 'weightInGrams' (number). Example input: 'Помидоры 150г'. Output: [{"foodName": "tomatoes", "weightInGrams": 150}]. Do NOT output markdown fences.
+  const translationPrompt = `You are a strict USDA FoodData Central data mapper. Translate the Russian ingredients into the most generic, raw base English names suitable for the USDA SR Legacy database.
+RULES:
+- Always append 'raw' if the item is a fresh vegetable, meat, or fish.
+- Strip cooking/packaging terms like 'fillet', 'bulb', 'slice', 'steak', 'cherry'.
+- Examples: 'Томаты черри' -> 'tomatoes raw', 'Филе лосося' -> 'salmon raw', 'Чеснок' -> 'garlic raw', 'Оливковое масло' -> 'olive oil'.
+Output ONLY a raw JSON array of objects: [{foodName: string, weightInGrams: number}].
 
-Now parse and translate this: "${russianText}"`;
+Now process this: "${russianText}"`;
 
   try {
     const result = await generateContentWithFallback({
       contents: { parts: [{ text: translationPrompt }] },
-      config: { responseMimeType: "text/plain", temperature: 0.1 }
+      config: { responseMimeType: "text/plain", temperature: 0 }
     });
     const raw = result.text?.trim() || "";
     const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "").trim();
@@ -257,14 +262,19 @@ async function fetchUsdaNutrition(ingredients: { foodName: string; weightInGrams
 
   try {
     for (const ingr of ingredients) {
-      const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${USDA_API_KEY}&query=${encodeURIComponent(ingr.foodName)}&pageSize=1&dataType=Foundation,SR%20Legacy`;
+      const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${USDA_API_KEY}&query=${encodeURIComponent(ingr.foodName)}&pageSize=3&dataType=Foundation,SR%20Legacy&requireAllWords=true`;
       const response = await fetch(url);
       if (!response.ok) {
         console.warn(`[USDA] API returned status ${response.status} for query: ${ingr.foodName}`);
         continue;
       }
       const data = await response.json();
-      const food = data.foods?.[0];
+      const skipWords = ["blend", "substitute", "vegetarian", "imitation", "fabricated", "formulated", "frankfurter", "lunchmeat", "powder", "leaves", "flakes", "canned", "prepared"];
+      const foods = data.foods || [];
+      const food = foods.find((f: any) =>
+        f.foodNutrients &&
+        !skipWords.some(w => f.description?.toLowerCase().includes(w))
+      ) || foods[0];
       if (!food || !Array.isArray(food.foodNutrients)) {
         console.warn(`[USDA] No food or nutrients found for query: ${ingr.foodName}`);
         continue;
@@ -281,8 +291,21 @@ async function fetchUsdaNutrition(ingredients: { foodName: string; weightInGrams
         return nut ? (nut.value || 0) : 0;
       };
 
+      const findEnergyInKcal = (): number => {
+        const nut = nutrientsList.find((n: any) =>
+          n.nutrientName && n.nutrientName.toLowerCase().includes("energy")
+        );
+        if (!nut) return 0;
+        const unit = (nut.unitName || "").toLowerCase();
+        const val = nut.value || 0;
+        return unit === "kj" ? Math.round(val / 4.184) : val;
+      };
+
+      const baseCals = findEnergyInKcal();
+      console.log("[PIPELINE TRACE 3] USDA Queried:", ingr.foodName, "→ Matched FDC ID:", food.fdcId, food.description, "Base cals (per 100g):", baseCals);
+
       // Extract raw values per 100g
-      const rawEnergy = findNutrientValue("Energy");
+      const rawEnergy = baseCals;
       const rawProtein = findNutrientValue("Protein");
       const rawFat = findNutrientValue("Total lipid (fat)") || findNutrientValue("Total lipid");
       const rawCarbs = findNutrientValue("Carbohydrate");
@@ -495,6 +518,7 @@ async function startServer() {
   app.post("/api/analyze-dish", async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     const { ingredients, defaultDishName } = req.body || {};
+    console.log("[PIPELINE TRACE 1] Raw Input from Client:", JSON.stringify(ingredients?.map((i: any) => ({ name: i.fullName || i.shortName, weight: i.weight }))), "HasImage: false");
     try {
       if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
         return res.status(400).json({ error: "No ingredients received" });
@@ -553,6 +577,7 @@ Important Rules:
         contents: promptText,
         config: {
           responseMimeType: "application/json",
+          temperature: 0,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -603,6 +628,7 @@ Important Rules:
       try {
         console.log("[USDA] Starting parse and translation of ingredients...");
         const parsedIngredients = await parseAndTranslateIngredients(ingredients);
+        console.log("[PIPELINE TRACE 2] LLM Parsed/Translated Ingredients:", JSON.stringify(parsedIngredients, null, 2));
         console.log("[USDA] Parsed and translated ingredients:", parsedIngredients);
         const usdaResult = await fetchUsdaNutrition(parsedIngredients);
 
@@ -640,6 +666,7 @@ Important Rules:
           compliance: { title: "Соответствие растительному рациону", text: forbiddenFound.length > 0 ? "Обнаружены несоответствия WFPB." : "Блюдо соответствует WFPB-рациону." }
         }
       };
+      console.log("[PIPELINE TRACE 4] Response:", JSON.stringify({ dishName: resultData.dishName, nutrients: resultData.nutrients, insightCount: resultData.insights ? Object.keys(resultData.insights).length : 0 }, null, 2));
       return res.json({ result: resultData });
     } catch (error: any) {
       console.log("Local program nutrition calculation fallback triggered:", error?.message || error);
