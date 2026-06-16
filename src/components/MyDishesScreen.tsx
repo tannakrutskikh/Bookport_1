@@ -31,6 +31,7 @@ export interface SavedDish {
   isFavorite?: boolean;
   isNew?: boolean;
   dayIndex?: number;
+  createdAt: string;
   ingredients: { name: string; weight: string; status: "green" | "yellow" | "red" }[];
   calories: number;
   protein: string;
@@ -622,6 +623,9 @@ export default function MyDishesScreen({
                     <span className="flex items-center gap-1.5 bg-black/25 py-1 px-2.5 rounded-full backdrop-blur-xs">
                       <Clock className="w-4 h-4 text-[#10D150]" />
                       {selectedDish.time}
+                    </span>
+                    <span className="flex items-center gap-1.5 bg-black/25 py-1 px-2.5 rounded-full backdrop-blur-xs">
+                      {selectedDish.createdAt}
                     </span>
                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-black border border-white/20 bg-white/15 backdrop-blur-xs`}>
                       {selectedDish.tag}

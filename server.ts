@@ -4,10 +4,14 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { findForbiddenInText } from "./src/data/wfpb_forbidden_ingredients";
 
 dotenv.config();
 
 const PORT = 3000;
+
+const EDAMAM_APP_ID = "bc5f14bf";
+const EDAMAM_APP_KEY = "7155a06c6e7b251a7430edf7053126d7";
 
 // Initialize GoogleGenAI using the telemetry user-agent headers
 const ai = new GoogleGenAI({
@@ -204,6 +208,81 @@ function getUsdaFallbackData(ingredients: any[]) {
   };
 }
 
+// ── Edamam Nutrition API Integration ──
+
+async function translateIngredientsForEdamam(
+  ingredients: { fullName?: string; shortName?: string; weight?: number }[]
+): Promise<string[]> {
+  const russianText = ingredients
+    .map(ing => `${ing.fullName || ing.shortName || "ингредиент"} ${ing.weight || 100}г`)
+    .join(", ");
+
+  const translationPrompt = `You are a technical translator. Translate the following recipe ingredients from Russian to English. Output ONLY a raw JSON array of strings, one string per ingredient with its quantity and unit. Do NOT use markdown formatting like \`\`\`json.
+
+Example input: "Помидоры 100г, Огурец 50г, Лук репчатый 30г"
+Example output: ["100 g tomatoes","50 g cucumber","30 g onion"]
+
+Now translate this: "${russianText}"`;
+
+  try {
+    const result = await generateContentWithFallback({
+      contents: { parts: [{ text: translationPrompt }] },
+      config: { responseMimeType: "text/plain", temperature: 0.1 }
+    });
+    const raw = result.text?.trim() || "";
+    const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "").trim();
+    const parsed: string[] = JSON.parse(cleaned);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  } catch (e) {
+    console.warn("[Edamam] Translation failed:", e);
+  }
+
+  return ingredients.map(ing => {
+    const name = ing.fullName || ing.shortName || "ingredient";
+    const w = ing.weight || 100;
+    return `${w} g ${name}`;
+  });
+}
+
+async function fetchEdamamNutrition(englishIngredients: string[]): Promise<{
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  fiber: number;
+} | null> {
+  try {
+    const response = await fetch(
+      `https://api.edamam.com/api/nutrition-details?app_id=${EDAMAM_APP_ID}&app_key=${EDAMAM_APP_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "User Recipe", ingr: englishIngredients })
+      }
+    );
+    if (!response.ok) {
+      console.warn(`[Edamam] API returned ${response.status}`);
+      return null;
+    }
+    const data = await response.json();
+    const nutrients = data.totalNutrients || {};
+    const extract = (key: string) => {
+      const entry = nutrients[key];
+      return entry ? Math.round((entry.quantity || 0) * 100) / 100 : 0;
+    };
+    return {
+      calories: Math.round(data.calories || 0),
+      protein: extract("PROCNT"),
+      fat: extract("FAT"),
+      carbs: extract("CHOCDF"),
+      fiber: extract("FIBTG"),
+    };
+  } catch (e) {
+    console.warn("[Edamam] Fetch failed:", e);
+    return null;
+  }
+}
+
 async function startServer() {
   const app = express();
 
@@ -385,7 +464,7 @@ async function startServer() {
     }
   });
 
-  // API endpoint for true nutrient analysis based on USDA databases using Gemini 3.5 Flash
+  // API endpoint for true nutrient analysis — Edamam API with RU→EN translation proxy
   app.post("/api/analyze-dish", async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     const { ingredients, defaultDishName } = req.body || {};
@@ -394,36 +473,30 @@ async function startServer() {
         return res.status(400).json({ error: "No ingredients received" });
       }
 
-      // Convert ingredients list into readable representation
       const ingredientsDescription = ingredients
         .map(ing => `- ${ing.fullName || ing.shortName}: ${ing.weight || 100}g`)
         .join("\n");
 
-      const promptText = `You are a professional certified food nutritionist and USDA Database Analyzer for the "Всё дело в еде!" plant-based (WFPB) app.
+      const forbiddenFound = findForbiddenInText(ingredientsDescription);
+      let forbiddenWarning = "";
+      if (forbiddenFound.length > 0) {
+        const details = forbiddenFound.map(f => `- "${f.ingredient}": ${f.reason}`).join("\n");
+        forbiddenWarning = `⚠️ ВНИМАНИЕ: Среди ингредиентов обнаружены продукты, НЕ соответствующие WFPB-стандарту! Предупреди пользователя мягко, но прямо, и дай рекомендации по замене:\n${details}\n\nПожалуйста, отрази это в блоке "compliance" в ответе.\n\n`;
+      }
+
+      // ── Step A: LLM analysis for dish name + insights ──
+      const promptText = `${forbiddenWarning}You are a professional certified food nutritionist and USDA Database Analyzer for the "Всё дело в еде!" plant-based (WFPB) app.
 The user confirmed the following list of verified ingredients with their weights in grams:
 ${ingredientsDescription}
 
 Your task is to:
-1. Identify each ingredient in the official USDA Food Data Central database.
-2. Obtain exact nutrients per 100g.
-3. Multiply and scale their nutrients proportional to their actual weight (e.g. if weight is 50g, take half of 100g value).
-4. Sum all nutrient, vitamin, amino acid, and mineral values to compute the aggregated nutritional profile of the entire dish.
-5. Provide three customized nutritional insights in Russian based on the calculations:
-   - "Сильные стороны блюда" (Strengths of this meal)
-   - "Что можно улучшить" (What to improve, e.g. adding fatty acids or specific leafy greens)
-   - "Соответствие растительному рациону" (Strict check according to WFPB rules: No animal products, No salt, No added oils. Mention if they forced any non-compliant ingredients).
+1. Identify each ingredient and provide three customized nutritional insights in Russian based on the composition.
+2. Provide a Russian dish name based on the ingredients.
+3. Estimate micronutrient values (iron, zinc, magnesium, iodine, selenium, vitamin C, vitamin B9, lysine, methionine).
 
 Return ONLY a valid JSON object matching this schema:
 {
-  "dishName": "string (Russian Name of the entire dish, e.g. 'Тёплый боул с киноа и нутом' or another descriptive name based on the combination of ingredients)",
-  "nutrients": {
-    "calories": { "value": number, "unit": "ккал" },
-    "protein": { "value": number, "unit": "г" },
-    "fats": { "value": number, "unit": "г" },
-    "carbs": { "value": number, "unit": "г" },
-    "fiber": { "value": number, "unit": "г" },
-    "omegaRatio": { "value": "string (formatted ratio, e.g., '3:1' or '4:1' or '2:1')", "unit": "" }
-  },
+  "dishName": "string (Russian Name of the entire dish, e.g. 'Тёплый боул с киноа и нутом')",
   "micronutrients": {
     "iron": { "value": number, "unit": "мг" },
     "zinc": { "value": number, "unit": "мг" },
@@ -436,28 +509,18 @@ Return ONLY a valid JSON object matching this schema:
     "methionine": { "value": number, "unit": "г" }
   },
   "insights": {
-    "strengths": {
-      "title": "Сильные стороны блюда",
-      "text": "string (custom nutrition strengths summary in Russian)"
-    },
-    "improvements": {
-      "title": "Что можно улучшить",
-      "text": "string (custom helpful actionable advice in Russian)"
-    },
-    "compliance": {
-      "title": "Соответствие растительному рациону",
-      "text": "string (assessment in Russian of adherence to WFPB - No salt, No animal products, No oil)"
-    }
+    "strengths": { "title": "Сильные стороны блюда", "text": "string" },
+    "improvements": { "title": "Что можно улучшить", "text": "string" },
+    "compliance": { "title": "Соответствие растительному рациону", "text": "string" }
   }
 }
 
 Important Rules:
 - All texts, titles, and descriptions MUST be strictly in Russian.
-- Do NOT simulate or invent fake metrics. Execute the true USDA calculation.
-- If any forbidden animal products or salted items are passed (like 'meat' or 'salt'), perform the analysis honestly, but flag them as highly controversial in the compliance section.
-- Output ONLY valid JSON, do not include any other markdown formatting outside of the json envelope.`;
+- Do NOT simulate or invent fake metrics for micronutrients — use reasonable estimates based on ingredient knowledge.
+- Output ONLY valid JSON, do not include any other markdown formatting.`;
 
-      const response = await generateContentWithFallback({
+      const llmResponse = await generateContentWithFallback({
         contents: promptText,
         config: {
           responseMimeType: "application/json",
@@ -465,122 +528,84 @@ Important Rules:
             type: Type.OBJECT,
             properties: {
               dishName: { type: Type.STRING },
-              nutrients: {
-                type: Type.OBJECT,
-                properties: {
-                  calories: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  protein: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  fats: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  carbs: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  fiber: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  omegaRatio: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.STRING }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  }
-                },
-                required: ["calories", "protein", "fats", "carbs", "fiber", "omegaRatio"]
-              },
               micronutrients: {
                 type: Type.OBJECT,
                 properties: {
-                  iron: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  zinc: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  magnesium: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  iodine: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  selenium: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  vitaminC: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  vitaminB9: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  lysine: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  },
-                  methionine: {
-                    type: Type.OBJECT,
-                    properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } },
-                    required: ["value", "unit"]
-                  }
+                  iron: { type: Type.OBJECT, properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } }, required: ["value", "unit"] },
+                  zinc: { type: Type.OBJECT, properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } }, required: ["value", "unit"] },
+                  magnesium: { type: Type.OBJECT, properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } }, required: ["value", "unit"] },
+                  iodine: { type: Type.OBJECT, properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } }, required: ["value", "unit"] },
+                  selenium: { type: Type.OBJECT, properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } }, required: ["value", "unit"] },
+                  vitaminC: { type: Type.OBJECT, properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } }, required: ["value", "unit"] },
+                  vitaminB9: { type: Type.OBJECT, properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } }, required: ["value", "unit"] },
+                  lysine: { type: Type.OBJECT, properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } }, required: ["value", "unit"] },
+                  methionine: { type: Type.OBJECT, properties: { value: { type: Type.NUMBER }, unit: { type: Type.STRING } }, required: ["value", "unit"] }
                 },
                 required: ["iron", "zinc", "magnesium", "iodine", "selenium", "vitaminC", "vitaminB9", "lysine", "methionine"]
               },
               insights: {
                 type: Type.OBJECT,
                 properties: {
-                  strengths: {
-                    type: Type.OBJECT,
-                    properties: { title: { type: Type.STRING }, text: { type: Type.STRING } },
-                    required: ["title", "text"]
-                  },
-                  improvements: {
-                    type: Type.OBJECT,
-                    properties: { title: { type: Type.STRING }, text: { type: Type.STRING } },
-                    required: ["title", "text"]
-                  },
-                  compliance: {
-                    type: Type.OBJECT,
-                    properties: { title: { type: Type.STRING }, text: { type: Type.STRING } },
-                    required: ["title", "text"]
-                  }
+                  strengths: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, text: { type: Type.STRING } }, required: ["title", "text"] },
+                  improvements: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, text: { type: Type.STRING } }, required: ["title", "text"] },
+                  compliance: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, text: { type: Type.STRING } }, required: ["title", "text"] }
                 },
                 required: ["strengths", "improvements", "compliance"]
               }
             },
-            required: ["dishName", "nutrients", "micronutrients", "insights"]
+            required: ["dishName", "micronutrients", "insights"]
           }
         }
       });
 
-      const textOutput = response.text || "{}";
-      const resultData = JSON.parse(textOutput);
+      const llmText = llmResponse.text || "{}";
+      const llmData = JSON.parse(llmText);
+
+      // ── Step B: Edamam via RU→EN translation ──
+      const englishIngredients = await translateIngredientsForEdamam(ingredients);
+      console.log("[Edamam] Translated ingredients:", englishIngredients);
+      const edamamResult = await fetchEdamamNutrition(englishIngredients);
+
+      let nutrients = {
+        calories: { value: 0, unit: "ккал" },
+        protein: { value: 0, unit: "г" },
+        fats: { value: 0, unit: "г" },
+        carbs: { value: 0, unit: "г" },
+        fiber: { value: 0, unit: "г" },
+        omegaRatio: { value: "—", unit: "" }
+      };
+
+      if (edamamResult) {
+        console.log("[Edamam] Success — calories:", edamamResult.calories);
+        nutrients = {
+          calories: { value: edamamResult.calories, unit: "ккал" },
+          protein: { value: edamamResult.protein, unit: "г" },
+          fats: { value: edamamResult.fat, unit: "г" },
+          carbs: { value: edamamResult.carbs, unit: "г" },
+          fiber: { value: edamamResult.fiber, unit: "г" },
+          omegaRatio: { value: edamamResult.fiber > 0 ? "—" : "—", unit: "" }
+        };
+      } else {
+        console.warn("[Edamam] Failed, LLM macro estimates will be absent — using defaults");
+      }
+
+      // ── Merge ──
+      const resultData = {
+        dishName: llmData.dishName || defaultDishName || "Цельное растительное блюдо",
+        nutrients,
+        micronutrients: llmData.micronutrients || {
+          iron: { value: 0, unit: "мг" }, zinc: { value: 0, unit: "мг" },
+          magnesium: { value: 0, unit: "мг" }, iodine: { value: 0, unit: "мкг" },
+          selenium: { value: 0, unit: "мкг" }, vitaminC: { value: 0, unit: "мг" },
+          vitaminB9: { value: 0, unit: "мкг" }, lysine: { value: 0, unit: "г" },
+          methionine: { value: 0, unit: "г" }
+        },
+        insights: llmData.insights || {
+          strengths: { title: "Сильные стороны блюда", text: "Блюдо на основе цельных растительных ингредиентов." },
+          improvements: { title: "Что можно улучшить", text: "Добавьте больше зелени и семян для баланса нутриентов." },
+          compliance: { title: "Соответствие растительному рациону", text: forbiddenFound.length > 0 ? "Обнаружены несоответствия WFPB." : "Блюдо соответствует WFPB-рациону." }
+        }
+      };
       return res.json({ result: resultData });
     } catch (error: any) {
       console.log("Local program nutrition calculation fallback triggered:", error?.message || error);

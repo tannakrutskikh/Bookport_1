@@ -71,6 +71,9 @@ const intentMap: Record<string, string> = {
   offense_and_anger: 'offense_and_anger',
   irritation_and_anger: 'irritation_and_anger',
   anger: 'anger',
+  joy_and_celebration: 'joy_and_admiration',
+  scientific_approval: 'important_affirmation',
+  warm_encouragement: 'affirmation',
   screaming: 'screaming',
   anna_screaming: 'anna_screaming',
   mockery: 'mockery',
@@ -187,6 +190,9 @@ const textKeywordMap: Array<{ keywords: string[]; toneGroup: ToneGroup; intent: 
   { keywords: ['горжусь', 'молодец', 'отлично', 'здорово', 'класс', 'красавчик'], toneGroup: 'positive', intent: 'joy_user_success' },
   { keywords: ['красота', 'прекрасно', 'чудесно', 'великолепно', 'потрясающе'], toneGroup: 'positive', intent: 'joy' },
   { keywords: ['доволен', 'супер', 'топ', 'лучше', 'круто', 'шикарно'], toneGroup: 'positive', intent: 'satisfaction_user_action' },
+  { keywords: ['отмечаю', 'праздную', 'ура', 'успех', 'цель достигнута', 'достижение', 'победа'], toneGroup: 'positive', intent: 'joy_and_celebration' },
+  { keywords: ['научно', 'исследование', 'доказано', 'исследования показывают', 'статья', 'метаанализ', 'рандомизированное'], toneGroup: 'positive', intent: 'scientific_approval' },
+  { keywords: ['верю в тебя', 'ты сможешь', 'поддержи', 'ободри', 'всё получится', 'ты справишься', 'молодец'], toneGroup: 'positive', intent: 'warm_encouragement' },
 
   // ── neutral: deep thought & curiosity ──
   { keywords: ['почему', 'зачем', 'отчего', 'интересно', 'любопытно', 'расскажи'], toneGroup: 'neutral_thoughtful', intent: 'curiosity' },
@@ -203,7 +209,7 @@ const textKeywordMap: Array<{ keywords: string[]; toneGroup: ToneGroup; intent: 
   { keywords: ['ни за что', 'никогда', 'исключено', 'запрети'], toneGroup: 'negative_displeasure', intent: 'denial_and_prohibitions' },
   { keywords: ['обидно', 'обидела', 'грустно', 'жаль', 'жалко'], toneGroup: 'negative_displeasure', intent: 'offense' },
   { keywords: ['возмущён', 'негодую', 'как так'], toneGroup: 'negative_displeasure', intent: 'offense_and_anger' },
-  { keywords: ['надоело', 'устал', 'достало', 'бесит', 'раздражает'], toneGroup: 'negative_displeasure', intent: 'irritation_and_anger' },
+  { keywords: ['надоело', 'устал', 'достало', 'бесит', 'раздражает', 'злит', 'выводит из себя', 'терпеть не могу', 'дурак', 'тупица', 'идиот'], toneGroup: 'negative_displeasure', intent: 'irritation_and_anger' },
   { keywords: ['злюсь', 'зол', 'в ярости', 'бешенство', 'взбешён'], toneGroup: 'negative_displeasure', intent: 'anger' },
   { keywords: ['разочарован', 'разочарование', 'не оправдало', 'обманулся'], toneGroup: 'negative_displeasure', intent: 'disappointment' },
   { keywords: ['бесполезно', 'всё зря', 'тщетно', 'разочаровалась'], toneGroup: 'negative_displeasure', intent: 'disappointment_and_dissatisfaction' },

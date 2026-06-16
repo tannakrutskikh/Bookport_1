@@ -1369,9 +1369,16 @@ export default function App() {
                     status: item.status === "error" ? "red" as const : ((item.status === "green" || item.status === "yellow" || item.status === "red") ? item.status : "green" as const)
                   }));
 
+                  const nowDate = new Date();
+                  const createdAtStr = nowDate.toLocaleDateString("ru-RU", {
+                    year: "numeric", month: "long", day: "numeric",
+                    hour: "2-digit", minute: "2-digit"
+                  });
+
                   const newDish: SavedDish = {
                     id: generatedId,
                     name: dishName,
+                    createdAt: createdAtStr,
                     time: "20 минут",
                     tag: determinedCategory === "Салаты" || determinedCategory === "Напитки" ? "Лёгкий ужин" : (determinedCategory === "Завтраки" ? "Для энергии" : "Белок"),
                     category: determinedCategory,
