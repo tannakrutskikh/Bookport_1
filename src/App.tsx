@@ -185,7 +185,7 @@ function getAnnaBubbleStyle(currentScreen: string) {
 
 export default function App() {
   const [screen, setScreen] = useState<"welcome" | "personal-data" | "health-goals" | "my-page" | "digestion" | "my-day" | "habits-twenty" | "what-i-eat" | "check-composition" | "dish-analysis" | "my-dishes" | "from-what-is" | "book-recipes" | "purchases" | "diary" | "anna" | "state-now" | "settings">("welcome");
-  const buildVersion = "7.5";
+  const buildVersion = "8.0";
   const annaAvatarSrc = resolveGeneralAvatar().src;
   // Check if saved settings exist (source of truth priority flag)
   const hasSavedSettings = typeof window !== "undefined" && localStorage.getItem("wfpb_has_saved_settings") === "true";
