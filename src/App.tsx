@@ -1316,7 +1316,7 @@ export default function App() {
               <DishAnalysisScreen 
                 ingredients={customMealIngredients || []}
                 onBack={() => setScreen("check-composition")}
-                onConfirm={(dishName) => {
+                onConfirm={(dishName, computedNutrients, annaComment) => {
                   setMealCount(prev => Math.min(4, prev + 1));
                   setClickCount(prev => prev + 25);
                   setMeals(prev => prev.map((m, idx) => {
@@ -1369,31 +1369,27 @@ export default function App() {
                     status: item.status === "error" ? "red" as const : ((item.status === "green" || item.status === "yellow" || item.status === "red") ? item.status : "green" as const)
                   }));
 
-                  const nowDate = new Date();
-                  const createdAtStr = nowDate.toLocaleDateString("ru-RU", {
-                    year: "numeric", month: "long", day: "numeric",
-                    hour: "2-digit", minute: "2-digit"
-                  });
-
                   const newDish: SavedDish = {
                     id: generatedId,
                     name: dishName,
-                    createdAt: createdAtStr,
+                    createdAt: new Date().toISOString(),
                     time: "20 минут",
                     tag: determinedCategory === "Салаты" || determinedCategory === "Напитки" ? "Лёгкий ужин" : (determinedCategory === "Завтраки" ? "Для энергии" : "Белок"),
                     category: determinedCategory,
                     image: currentMealImage || customImage,
                     isFavorite: false,
-                    calories: Math.floor(Math.random() * 80) + 180,
-                    protein: `${Math.floor(Math.random() * 5) + 6} г`,
-                    fiber: `${Math.floor(Math.random() * 4) + 5} г`,
-                    fat: `${Math.floor(Math.random() * 3) + 2} г`,
+                    calories: computedNutrients ? computedNutrients.calories : Math.floor(Math.random() * 80) + 180,
+                    protein: computedNutrients ? computedNutrients.protein : `${Math.floor(Math.random() * 5) + 6} г`,
+                    fiber: computedNutrients ? computedNutrients.fiber : `${Math.floor(Math.random() * 4) + 5} г`,
+                    fat: computedNutrients ? computedNutrients.fat : `${Math.floor(Math.random() * 3) + 2} г`,
                     isNew: true,
                     dayIndex: currentDayIndex,
-                    annaTip: generateUniqueAnnaTip(dishName, determinedCategory, mappedIngredients),
+                    annaTip: annaComment || generateUniqueAnnaTip(dishName, determinedCategory, mappedIngredients),
                     ingredients: mappedIngredients.length > 0 ? mappedIngredients : [
                       { name: "Свежие WFPB ингредиенты", weight: "120 г", status: "green" }
-                    ]
+                    ],
+                    computedNutrients,
+                    annaComment
                   };
 
                   setSavedDishes(prev => [newDish, ...prev]);

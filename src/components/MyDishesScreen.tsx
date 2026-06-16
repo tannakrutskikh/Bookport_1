@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import BottomBar from "./BottomBar";
 import CalendarButton from "./CalendarButton";
-import { resolveAvatar } from "../utils/annaAvatarResolver";
+import { resolveAvatar, resolveAvatarByState } from "../utils/annaAvatarResolver";
 
 const annaAvatarSrc = resolveAvatar({ toneGroup: 'positive', intent: 'affirmation' }).src;
 
@@ -38,6 +38,13 @@ export interface SavedDish {
   fiber: string;
   fat: string;
   annaTip: string;
+  computedNutrients?: {
+    calories: number;
+    protein: string;
+    fiber: string;
+    fat: string;
+  };
+  annaComment?: string;
 }
 
 interface MyDishesScreenProps {
@@ -622,10 +629,22 @@ export default function MyDishesScreen({
                   <div className="flex flex-wrap items-center gap-3.5 text-white/95 text-[12.5px] font-bold mt-1.5">
                     <span className="flex items-center gap-1.5 bg-black/25 py-1 px-2.5 rounded-full backdrop-blur-xs">
                       <Clock className="w-4 h-4 text-[#10D150]" />
-                      {selectedDish.time}
-                    </span>
-                    <span className="flex items-center gap-1.5 bg-black/25 py-1 px-2.5 rounded-full backdrop-blur-xs">
-                      {selectedDish.createdAt}
+                      {(() => {
+                        try {
+                          const d = new Date(selectedDish.createdAt);
+                          if (isNaN(d.getTime())) return selectedDish.createdAt;
+                          return d.toLocaleString("ru-RU", {
+                            timeZone: "Europe/Moscow",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit"
+                          });
+                        } catch (e) {
+                          return selectedDish.createdAt;
+                        }
+                      })()}
                     </span>
                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-black border border-white/20 bg-white/15 backdrop-blur-xs`}>
                       {selectedDish.tag}
@@ -650,19 +669,19 @@ export default function MyDishesScreen({
                 <div className="grid grid-cols-4 gap-2.5 mb-6.5">
                   <div className="bg-[#FAFBFB] rounded-[18px] p-2.5 text-center border border-[#EFF2F3] shadow-[0_2px_4px_rgba(0,0,0,0.01)]">
                     <span className="block text-[10px] text-[#737C86] font-bold">Калории</span>
-                    <span className="text-[15.5px] font-black text-[#2B3137] mt-0.5 block">{selectedDish.calories} <span className="text-[9.5px] font-medium text-text-sec">ккал</span></span>
+                    <span className="text-[15.5px] font-black text-[#2B3137] mt-0.5 block">{selectedDish.computedNutrients ? selectedDish.computedNutrients.calories : selectedDish.calories} <span className="text-[9.5px] font-medium text-text-sec">ккал</span></span>
                   </div>
                   <div className="bg-[#FAFBFB] rounded-[18px] p-2.5 text-center border border-[#EFF2F3] shadow-[0_2px_4px_rgba(0,0,0,0.01)]">
                     <span className="block text-[10px] text-[#737C86] font-bold">Белки</span>
-                    <span className="text-[15.5px] font-black text-[#15803D] mt-0.5 block">{selectedDish.protein}</span>
+                    <span className="text-[15.5px] font-black text-[#15803D] mt-0.5 block">{selectedDish.computedNutrients ? selectedDish.computedNutrients.protein : selectedDish.protein}</span>
                   </div>
                   <div className="bg-[#FAFBFB] rounded-[18px] p-2.5 text-center border border-[#EFF2F3] shadow-[0_2px_4px_rgba(0,0,0,0.01)]">
                     <span className="block text-[10px] text-[#737C86] font-bold">Клетчатка</span>
-                    <span className="text-[15.5px] font-black text-[#15803D] mt-0.5 block">{selectedDish.fiber}</span>
+                    <span className="text-[15.5px] font-black text-[#15803D] mt-0.5 block">{selectedDish.computedNutrients ? selectedDish.computedNutrients.fiber : selectedDish.fiber}</span>
                   </div>
                   <div className="bg-[#FAFBFB] rounded-[18px] p-2.5 text-center border border-[#EFF2F3] shadow-[0_2px_4px_rgba(0,0,0,0.01)]">
                     <span className="block text-[10px] text-[#737C86] font-bold">Жиры</span>
-                    <span className="text-[15.5px] font-black text-[#737C86] mt-0.5 block">{selectedDish.fat}</span>
+                    <span className="text-[15.5px] font-black text-[#737C86] mt-0.5 block">{selectedDish.computedNutrients ? selectedDish.computedNutrients.fat : selectedDish.fat}</span>
                   </div>
                 </div>
 
@@ -759,7 +778,7 @@ export default function MyDishesScreen({
                       <div className="relative shrink-0 select-none">
                         <div className="w-[48px] h-[48px] rounded-full overflow-hidden shadow-md border border-brand-green-mint/30 relative bg-white">
                           <img 
-                            src={annaAvatarSrc}
+                            src={resolveAvatarByState("Отвечаю", selectedDish.annaComment || "").src}
                             alt="Анна — Советник WFPB" 
                             className="w-full h-full object-cover"
                           />
@@ -785,7 +804,7 @@ export default function MyDishesScreen({
                   </div>
 
                   <div className="text-[13.5px] sm:text-[14px] text-[#2B3137] font-semibold leading-relaxed font-sans space-y-3">
-                    {annaExpertVoice.text.split("\n").map((para, pIdx) => {
+                    {(selectedDish.annaComment || annaExpertVoice.text).split("\n").map((para, pIdx) => {
                       if (!para.trim()) return <div key={pIdx} className="h-2" />;
                       
                       // Convert markdown **text** to <strong> and keep normal text

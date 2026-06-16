@@ -33,7 +33,16 @@ interface IngredientCard {
 interface DishAnalysisScreenProps {
   ingredients: IngredientCard[];
   onBack: () => void;
-  onConfirm: (dishName: string) => void;
+  onConfirm: (
+    dishName: string,
+    computedNutrients?: {
+      calories: number;
+      protein: string;
+      fiber: string;
+      fat: string;
+    },
+    annaComment?: string
+  ) => void;
   onCancel: () => void;
   dayNotes: Record<number, { text: string; time: string; source?: string; tags?: string[]; isVoice?: boolean }[]>;
   setDayNotes: React.Dispatch<React.SetStateAction<Record<number, { text: string; time: string; source?: string; tags?: string[]; isVoice?: boolean }[]>>>;
@@ -144,7 +153,16 @@ export default function DishAnalysisScreen({
       };
     });
 
-    onConfirm(customTitle || result?.dishName || "Цельное растительное блюдо");
+    const computedMacros = result ? {
+      calories: typeof result.nutrients.calories.value === 'number' ? result.nutrients.calories.value : parseInt(String(result.nutrients.calories.value), 10),
+      protein: typeof result.nutrients.protein.value === 'number' ? `${result.nutrients.protein.value} г` : String(result.nutrients.protein.value),
+      fiber: typeof result.nutrients.fiber.value === 'number' ? `${result.nutrients.fiber.value} г` : String(result.nutrients.fiber.value),
+      fat: typeof result.nutrients.fats.value === 'number' ? `${result.nutrients.fats.value} г` : String(result.nutrients.fats.value),
+    } : undefined;
+
+    const comment = getAnnaDetailedAdvice().text;
+
+    onConfirm(customTitle || result?.dishName || "Цельное растительное блюдо", computedMacros, comment);
   };
 
   const getAnnaDetailedAdvice = () => {
@@ -201,7 +219,7 @@ export default function DishAnalysisScreen({
         healthExplanation = "Эти нежелательные добавки засоряют микробиом и мешают естественным процессам лизосомального очищения. ";
       }
 
-      const genderEnding = isFemale ? "заметила" : "заметил";
+      const genderEnding = "заметила";
 
       return {
         title: "Анна — Советник WFPB",
@@ -837,7 +855,16 @@ export default function DishAnalysisScreen({
                   <BriefNoteBlock
                     moduleKey="food"
                     onSave={handleSaveMealNote}
-                    onSkip={() => onConfirm(customTitle || result?.dishName || "Цельное растительное блюдо")}
+                    onSkip={() => {
+                      const computedMacros = result ? {
+                        calories: typeof result.nutrients.calories.value === 'number' ? result.nutrients.calories.value : parseInt(String(result.nutrients.calories.value), 10),
+                        protein: typeof result.nutrients.protein.value === 'number' ? `${result.nutrients.protein.value} г` : String(result.nutrients.protein.value),
+                        fiber: typeof result.nutrients.fiber.value === 'number' ? `${result.nutrients.fiber.value} г` : String(result.nutrients.fiber.value),
+                        fat: typeof result.nutrients.fats.value === 'number' ? `${result.nutrients.fats.value} г` : String(result.nutrients.fats.value),
+                      } : undefined;
+                      const comment = getAnnaDetailedAdvice().text;
+                      onConfirm(customTitle || result?.dishName || "Цельное растительное блюдо", computedMacros, comment);
+                    }}
                   />
                 </div>
               ) : (
