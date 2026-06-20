@@ -15,7 +15,8 @@ import WhatIEatScreen from "./components/WhatIEatScreen";
 import CheckCompositionScreen from "./components/CheckCompositionScreen";
 import DishAnalysisScreen from "./components/DishAnalysisScreen";
 import CalendarOverlay from "./components/CalendarOverlay";
-import MyDishesScreen, { SavedDish } from "./components/MyDishesScreen";
+import RecipesScreen from "./components/RecipesScreen";
+import type { SavedDish } from "./components/MyDishesScreen";
 import FromWhatIsScreen from "./components/FromWhatIsScreen";
 import BookRecipesScreen from "./components/BookRecipesScreen";
 import MyPurchasesScreen from "./components/MyPurchasesScreen";
@@ -25,32 +26,14 @@ import AnnaScreen from "./components/AnnaScreen";
 import StateNowScreen from "./components/StateNowScreen";
 import SettingsScreen from "./components/SettingsScreen";
 import { SystemKeysStore } from "./services/SystemKeysStore";
+import MyRewardsScreen from "./modules/achievements/screens/MyRewardsScreen";
+import { isGodModeEnabled } from "./modules/achievements/config/achievementsGodMode";
+import { setCourseStartTimestamp } from "./modules/achievements/config/AchievementsMixerStore";
+import type { MixerConfig } from "./modules/mixer/types/mixer.types";
+import MixerScreen from "./modules/mixer/screens/MixerScreen";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { getCategoryColor } from "./utils/categoryColors";
 import { resolveGeneralAvatar, resolveAvatarByState } from "./utils/annaAvatarResolver";
-
-function generateUniqueAnnaTip(dishName: string, category: string, ingredients: any[]): string {
-  const normName = dishName.toLowerCase();
-  
-  if (normName.includes("салат") || category.toLowerCase() === "салаты") {
-    return `Потрясающий салат «${dishName}»! Свежая зелень в сочетании с хрустящими овощами — это мощнейший антиоксидантный коктейль для ваших микрососудов. Поскольку соли здесь нет, калий в овощах мгновенно усваивается клетками, мягко регулируя давление. Отличный выбор! 🌱`;
-  }
-  if (normName.includes("суп") || normName.includes("борщ") || normName.includes("бульон") || category.toLowerCase() === "супы") {
-    return `Горячий WFPB суп «${dishName}» — спасение для ворсинок кишечника. Крайне важно, что в бульоне нет соли и зажарок на масле. Пряности — чесночок и зелень — прекрасно стимулируют пищеварительные ферменты натуральным образом! 🥣`;
-  }
-  if (normName.includes("каша") || normName.includes("овсян") || normName.includes("гранол") || category.toLowerCase() === "завтраки") {
-    return `Правильный WFPB завтрак «${dishName}» медленно расщепляется, обеспечивая стабильную энергию без скачков сахара. Растительные волокна кормят полезную микробиоту, которая с самого утра начинает производить витамины группы B! 🌾`;
-  }
-  if (normName.includes("смузи") || normName.includes("сок") || category.toLowerCase() === "напитки") {
-    return `Освежающий напиток «${dishName}» богат биодоступным кремнием и структурированной клеточной влагой. Медленное потягивание этого напитка насыщает ткани кислородом и отлично утоляет жажду без лишней нагрузки на почки! 🥬`;
-  }
-  if (category.toLowerCase() === "дессерты" || category.toLowerCase() === "выпечка") {
-    return `Полезнейший десерт «${dishName}» приготовлен без белого сахара и очищенной муки. Натуральная сладость фруктов сопровождается ценнейшей клетчаткой, предотвращая лишнюю нагрузку на поджелудочную железу. Радость для души и тела! 🍌`;
-  }
-  if (category.toLowerCase() === "соусы") {
-    return `Ароматный WFPB-соус «${dishName}» на ореховой или овощной основе — идеальный способ обогатить любое блюдо без лишнего натрия! Натуральные специи дают такой богатый букет, что соль здесь просто не нужна. Ваши рецепторы будут в восторге! 🌿`;
-  }
-  return `Ваше блюдо «${dishName}» — это эталон WFPB питания! Без грамма соли, сахара, рафинированных масел и животных добавок. Клетки вашего организма получают концентрированные нутриенты в чистом, первозданном виде. Настоящая забота о своём здоровье! 💚`;
-}
 
 function getAnnaBubbleStyle(currentScreen: string) {
   switch (currentScreen) {
@@ -184,8 +167,8 @@ function getAnnaBubbleStyle(currentScreen: string) {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<"welcome" | "personal-data" | "health-goals" | "my-page" | "digestion" | "my-day" | "habits-twenty" | "what-i-eat" | "check-composition" | "dish-analysis" | "my-dishes" | "from-what-is" | "book-recipes" | "purchases" | "diary" | "anna" | "state-now" | "settings">("welcome");
-  const buildVersion = "8.0";
+  const [screen, setScreen] = useState<"welcome" | "personal-data" | "health-goals" | "my-page" | "digestion" | "my-day" | "habits-twenty" | "what-i-eat" | "check-composition" | "dish-analysis" | "my-dishes" | "from-what-is" | "book-recipes" | "purchases" | "diary" | "anna" | "state-now" | "settings" | "rewards">("welcome");
+  const buildVersion = "9.0";
   const annaAvatarSrc = resolveGeneralAvatar().src;
   // Check if saved settings exist (source of truth priority flag)
   const hasSavedSettings = typeof window !== "undefined" && localStorage.getItem("wfpb_has_saved_settings") === "true";
@@ -644,7 +627,9 @@ export default function App() {
     { id: "active", name: "30 мин активности", done: false },
   ]);
 
-  const [currentDayIndex, setCurrentDayIndex] = useState<number>(1); // Day 1 to 28
+  const [mixerConfig, setMixerConfig] = useState<MixerConfig | null>(null);
+
+  const [currentDayIndex, setCurrentDayIndex] = useState<number>(3); // Day 1 to 28
   const [dayNotes, setDayNotes] = useState<Record<number, { text: string; time: string; [key: string]: any }[]>>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -660,6 +645,17 @@ export default function App() {
 
   // Dynamic state container for HabitsTwenty screen checked circles data
   const [habitsTwentyData, setHabitsTwentyData] = useState<HabitsState | undefined>(undefined);
+
+  // Init achievement god mode + course start timestamp on fresh visit
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('achievements_god_mode', 'true')
+      const existing = localStorage.getItem('achievements_course_start_timestamp')
+      if (!existing) {
+        localStorage.setItem('achievements_course_start_timestamp', String(Date.now() - 3 * 24 * 60 * 60 * 1000))
+      }
+    }
+  }, [])
 
   // --- SPECIAL ANNA LOCAL OVERLAY CHAT STATES ---
   const [isOverlayOpen, setOverlayOpen] = useState(false);
@@ -939,6 +935,10 @@ export default function App() {
       setScreen("settings");
     };
 
+    const handleOpenRewards = () => {
+      setScreen("rewards");
+    };
+
     const handleStartPress = () => {
       startOverlaySpeech();
     };
@@ -967,6 +967,7 @@ export default function App() {
 
     window.addEventListener("open-anna-screen", handleOpenAnna);
     window.addEventListener("open-settings-screen", handleOpenSettings);
+    window.addEventListener("open-rewards-screen", handleOpenRewards);
     window.addEventListener("anna-overlay-start-press", handleStartPress);
     window.addEventListener("anna-overlay-end-press", handleEndPress);
     window.addEventListener("anna-overlay-cancel-press", handleCancelPress);
@@ -975,6 +976,7 @@ export default function App() {
     return () => {
       window.removeEventListener("open-anna-screen", handleOpenAnna);
       window.removeEventListener("open-settings-screen", handleOpenSettings);
+      window.removeEventListener("open-rewards-screen", handleOpenRewards);
       window.removeEventListener("anna-overlay-start-press", handleStartPress);
       window.removeEventListener("anna-overlay-end-press", handleEndPress);
       window.removeEventListener("anna-overlay-cancel-press", handleCancelPress);
@@ -998,7 +1000,7 @@ export default function App() {
   };
 
   const handleSaveDishCategory = (id: string, category: string) => {
-    setSavedDishes(prev => prev.map(d => d.id === id ? { ...d, category, isNew: false } : d));
+    setSavedDishes(prev => prev.map(d => d.id === id ? { ...d, category, isNew: false, categoryColor: getCategoryColor(category).shadow } : d));
   };
 
   const handleSaveProgress = (updatedHabits: any) => {
@@ -1198,7 +1200,7 @@ export default function App() {
             >
               <MyPageScreen 
                 onBack={() => setScreen("health-goals")} 
-                onOpenMyDay={() => setScreen("my-day")}
+                onOpenMyDay={() => { setCourseStartTimestamp(); setScreen("my-day"); }}
                 selectedChronic={selectedChronic}
                 selectedGoals={selectedGoals}
                 startingWeight={weight}
@@ -1344,47 +1346,31 @@ export default function App() {
                     determinedCategory = "соусы";
                   }
 
-                  // Default Unsplash WFPB healthy images
-                  let customImage = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=300";
-                  if (determinedCategory === "Салаты") {
-                    customImage = "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=300";
-                  } else if (determinedCategory === "Супы") {
-                    customImage = "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&q=80&w=300";
-                  } else if (determinedCategory === "Завтраки") {
-                    customImage = "https://images.unsplash.com/photo-1501747315-124a0eaca060?auto=format&fit=crop&q=80&w=300";
-                  } else if (determinedCategory === "Напитки") {
-                    customImage = "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=300";
-                  } else if (determinedCategory === "Дессерты") {
-                    customImage = "https://images.unsplash.com/photo-1511690656952-34342bb7c2f2?auto=format&fit=crop&q=80&w=300";
-                  } else if (determinedCategory === "выпечка") {
-                    customImage = "https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?auto=format&fit=crop&q=80&w=300";
-                  } else if (determinedCategory === "соусы") {
-                    customImage = "https://images.unsplash.com/photo-1470324161839-ce2bb6fa6bc3?auto=format&fit=crop&q=80&w=300";
-                  }
-
                   // Format verified scanned ingredients smoothly
                   const mappedIngredients = (customMealIngredients || []).map((item, idx) => ({
                     name: item.fullName || item.shortName || `Компонент ${idx + 1}`,
                     weight: item.weight ? `${item.weight} г` : "75 г",
-                    status: item.status === "error" ? "red" as const : ((item.status === "green" || item.status === "yellow" || item.status === "red") ? item.status : "green" as const)
+                    status: item.status === "error" ? "red" as const : ((item.status === "green" || item.status === "yellow" || item.status === "red") ? item.status : "green" as const),
+                    manuallyAllowed: item.manuallyAllowed === true
                   }));
 
                   const newDish: SavedDish = {
                     id: generatedId,
                     name: dishName,
                     createdAt: new Date().toISOString(),
-                    time: "20 минут",
+                    time: "",
                     tag: determinedCategory === "Салаты" || determinedCategory === "Напитки" ? "Лёгкий ужин" : (determinedCategory === "Завтраки" ? "Для энергии" : "Белок"),
                     category: determinedCategory,
-                    image: currentMealImage || customImage,
+                    image: currentMealImage || null,
                     isFavorite: false,
                     calories: computedNutrients ? computedNutrients.calories : Math.floor(Math.random() * 80) + 180,
                     protein: computedNutrients ? computedNutrients.protein : `${Math.floor(Math.random() * 5) + 6} г`,
                     fiber: computedNutrients ? computedNutrients.fiber : `${Math.floor(Math.random() * 4) + 5} г`,
                     fat: computedNutrients ? computedNutrients.fat : `${Math.floor(Math.random() * 3) + 2} г`,
                     isNew: true,
+                    categoryColor: getCategoryColor(determinedCategory).shadow,
                     dayIndex: currentDayIndex,
-                    annaTip: annaComment || generateUniqueAnnaTip(dishName, determinedCategory, mappedIngredients),
+                    annaTip: annaComment || "",
                     ingredients: mappedIngredients.length > 0 ? mappedIngredients : [
                       { name: "Свежие WFPB ингредиенты", weight: "120 г", status: "green" }
                     ],
@@ -1394,6 +1380,19 @@ export default function App() {
 
                   setSavedDishes(prev => [newDish, ...prev]);
                   setScreen("my-dishes");
+
+                  fetch("/api/anna-comment", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ dishName, ingredients: mappedIngredients })
+                  })
+                    .then(r => r.json())
+                    .then(data => {
+                      if (data.comment) {
+                        setSavedDishes(prev => prev.map(d => d.id === generatedId ? { ...d, annaTip: data.comment, annaComment: d.annaComment || data.comment } : d));
+                      }
+                    })
+                    .catch(() => {});
                 }}
                 onCancel={() => {
                   setScreen("my-day");
@@ -1407,22 +1406,18 @@ export default function App() {
             </motion.div>
           ) : screen === "my-dishes" ? (
             <motion.div
-              key="my-dishes-view"
+              key="recipes-view"
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.4 }}
               className="flex-1 flex flex-col"
             >
-              <MyDishesScreen 
+              <RecipesScreen 
                 onBack={() => setScreen("my-day")}
                 savedDishes={savedDishes}
                 onToggleFavorite={handleToggleFavorite}
                 onSaveDishCategory={handleSaveDishCategory}
-                dayNotes={dayNotes}
-                currentDayIndex={currentDayIndex}
-                screen={screen}
-                onOpenCalendar={() => setShowGlobalCalendar(true)}
                 onNavigateHome={() => setScreen("my-day")}
                 onNavigateDiary={() => setScreen("what-i-eat")}
                 onNavigateProgress={() => setScreen("habits-twenty")}
@@ -1597,6 +1592,22 @@ export default function App() {
                 }}
               />
             </motion.div>
+          ) : screen === "rewards" ? (
+            <motion.div
+              key="rewards-view"
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.4 }}
+              className="flex-1 flex flex-col"
+            >
+              <MyRewardsScreen
+                onBack={() => setScreen("my-day")}
+                userGender={userGender}
+                isGodMode={isGodModeEnabled()}
+                onMixerLaunch={setMixerConfig}
+              />
+            </motion.div>
           ) : screen === "settings" ? (
             <motion.div
               key="settings-view"
@@ -1663,6 +1674,7 @@ export default function App() {
                 onOpenHabitsTwenty={() => setScreen("habits-twenty")}
                 onOpenWhatIEat={() => setScreen("what-i-eat")}
                 onOpenFromWhatIs={() => setScreen("from-what-is")}
+                onOpenRecipes={() => setScreen("my-dishes")}
                 onOpenBookRecipes={() => setScreen("book-recipes")}
                 onOpenPurchases={() => setScreen("purchases")}
                 onOpenDiary={() => setScreen("diary")}
@@ -1875,6 +1887,16 @@ export default function App() {
           setCurrentDayIndex={setCurrentDayIndex}
           recordClick={(pts) => setClickCount(prev => prev + (pts || 1))}
         />
+
+        {/* MixerScreen overlay */}
+        <AnimatePresence>
+          {mixerConfig && (
+            <MixerScreen
+              config={mixerConfig}
+              onClose={() => setMixerConfig(null)}
+            />
+          )}
+        </AnimatePresence>
 
       </motion.div>
     </div>

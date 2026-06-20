@@ -6,6 +6,8 @@
  * server-side APIs or private models in the future.
  */
 
+import { checkWFPB } from "../utils/wfpbRules";
+
 export interface AIProviderConfig {
   provider: "studio" | "server" | "hybrid";
   studioEndpointPrefix: string;
@@ -129,24 +131,6 @@ export const AISystemConfig = {
     ]
   },
 
-  // 2. Strict WFPB and Zero Salt Evaluation Criteria
-  WFPBDecisionRules: {
-    strictlyForbidden: [
-      "мясо", "птица", "говядина", "свинина", "баранина", "курица", "индейка",
-      "рыба", "лосось", "тунец", "морепродукты", "креветки", "кальмары",
-      "яйца", "куриные яйца", "молоко", "коровье молоко", "сливки", "сыр",
-      "творог", "йогурт", "масло сливочное", "мёд", "желатин"
-    ],
-    zeroSaltAdditives: [
-      "соль", "морская соль", "гималайская соль", "соевый соус", "мисо с солью",
-      "бульонные кубики", "приправы с солью"
-    ],
-    forbiddenOils: [
-      "масло оливковое", "масло подсолнечное", "кокосовое масло", "льняное масло",
-      "кунжутное масло", "растительное масло", "рафинированное масло"
-    ]
-  },
-
   // 3. AI Prompts for vision and analysis (used to update custom engines)
   Prompts: {
     ingredientRecognition: `Analyze the dish image to extract ingredients matching WFPB rules. Use strictly JSON schema.`,
@@ -180,16 +164,8 @@ export function simulateLocalUSDAPlan(ingredients: any[]): MealAnalysisResult {
   let methionine = 0;
 
   const hasFails = ingredients.some(ing => {
-    const nameLower = (ing.fullName || ing.shortName || "").toLowerCase();
-    const isBean = nameLower.includes("фасоль") || nameLower.includes("фасол");
-
-    const isProhibited = (!isBean && AISystemConfig.WFPBDecisionRules.strictlyForbidden.some(f => nameLower.includes(f))) ||
-                         AISystemConfig.WFPBDecisionRules.zeroSaltAdditives.some(s => {
-                           if (s === "соль" && isBean) return false;
-                           return nameLower.includes(s);
-                         }) ||
-                         (!isBean && AISystemConfig.WFPBDecisionRules.forbiddenOils.some(o => nameLower.includes(o)));
-    return ing.status === "error" || isProhibited;
+    const ingName = ing.fullName || ing.shortName || "";
+    return ing.status === "error" || !checkWFPB(ingName).compliant;
   });
 
   ingredients.forEach(ing => {
@@ -527,26 +503,17 @@ export const IngredientRecognitionProvider = {
  */
 export const WFPBDecisionProvider = {
   checkCompliance(ingredientName: string): WFPBAuditResponse {
-    const nameLower = ingredientName.toLowerCase().trim();
+    const result = checkWFPB(ingredientName);
     const violations: string[] = [];
 
-    // Protect beans "фасоль", "фасоли" from "соль" substring match
-    const isBean = nameLower.includes("фасоль") || nameLower.includes("фасол");
-
-    const isAnimal = !isBean && AISystemConfig.WFPBDecisionRules.strictlyForbidden.some(f => nameLower.includes(f));
-    const hasSalt = AISystemConfig.WFPBDecisionRules.zeroSaltAdditives.some(s => {
-      if (s === "соль" && isBean) return false;
-      return nameLower.includes(s);
-    });
-    const hasOil = !isBean && AISystemConfig.WFPBDecisionRules.forbiddenOils.some(o => nameLower.includes(o));
-
-    if (isAnimal) {
+    const v = result.violations;
+    if (v.some(cat => ['animal', 'fish_seafood', 'dairy', 'egg', 'processed_meat', 'honey'].includes(cat))) {
       violations.push("Ингредиент животного происхождения (нарушает каноны WFPB)");
     }
-    if (hasSalt) {
+    if (v.includes('added_salt')) {
       violations.push("Содержит добавленную соль или вредные солесодержащие добавки");
     }
-    if (hasOil) {
+    if (v.includes('refined_oil')) {
       violations.push("Содержит рафинированные или добавленные растительные масла");
     }
 
@@ -598,6 +565,6 @@ export const AIServiceLayer = {
   },
 
   getRules() {
-    return AISystemConfig.WFPBDecisionRules;
+    return {};
   }
 };

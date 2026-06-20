@@ -1,21 +1,25 @@
 import React, { useRef, useState } from "react";
-import { Home, ClipboardList, BarChart3, Settings, User, PlusCircle } from "lucide-react";
+import { Home, BookOpen, BarChart3, Settings, Trophy } from "lucide-react";
 
 interface BottomBarProps {
   onHomeClick?: () => void;
-  onDiaryClick?: () => void;
+  onRecipesClick?: () => void;
   onAnalyticsClick?: () => void;
   onProfileClick?: () => void;
   onAnnaClick?: () => void;
-  activeTab?: "my-day" | "add-food" | "progress" | "cellular-impulse" | "home" | "diary" | "anna" | "settings";
+  onDiaryClick?: () => void;
+  onRewardsClick?: () => void;
+  activeTab?: "my-day" | "recipes" | "my-dishes" | "progress" | "cellular-impulse" | "home" | "diary" | "anna" | "settings" | "what-i-eat" | "add-food" | "rewards";
 }
 
 export default function BottomBar({ 
   onHomeClick, 
-  onDiaryClick, 
+  onRecipesClick, 
   onAnalyticsClick, 
   onProfileClick,
   onAnnaClick,
+  onDiaryClick,
+  onRewardsClick,
   activeTab = "my-day" 
 }: BottomBarProps) {
   const pressStartTimeRef = useRef<number>(0);
@@ -55,29 +59,29 @@ export default function BottomBar({
         </span>
       </button>
 
-      {/* Item 2: Добавить еду */}
+      {/* Item 2: Мои блюда */}
       <button 
-        id="nav-diary"
+        id="nav-recipes"
         type="button"
-        onClick={onDiaryClick}
+        onClick={onRecipesClick}
         className="flex-1 flex flex-col items-center justify-center gap-1 py-0.5 transition-all duration-200 cursor-pointer active:scale-95 text-center"
       >
         <div className={`w-7 h-7 flex items-center justify-center ${
-          activeTab === "add-food" || activeTab === "diary"
+          activeTab === "recipes" || activeTab === "my-dishes"
             ? "text-[#16B551]" 
             : "text-[#737C86] hover:text-brand-green-dark"
         }`}>
-          <PlusCircle className="w-6 h-6 stroke-[1.8]" />
+          <BookOpen className="w-6 h-6 stroke-[1.8]" />
         </div>
         <span 
           className={`text-[12px] sm:text-[13px] font-bold leading-none tracking-tight ${
-            activeTab === "add-food" || activeTab === "diary"
+            activeTab === "recipes" || activeTab === "my-dishes"
               ? "text-[#16B551]"
               : "text-[#737C86]"
           }`}
           style={{ fontFamily: '"Calibri", "Candara", sans-serif' }}
         >
-          Добавить еду
+          Мои блюда
         </span>
       </button>
 
@@ -90,7 +94,6 @@ export default function BottomBar({
           onPointerDown={(e) => {
             if (activeTab === "anna") return;
             
-            // Set pointer capture to catch releasing outside bounds
             try {
               e.currentTarget.setPointerCapture(e.pointerId);
             } catch (capErr) {
@@ -101,7 +104,6 @@ export default function BottomBar({
             isHoldingRef.current = true;
             setIsHolding(true);
             
-            // Dispatch event to open overlay in connecting/listening state
             window.dispatchEvent(new CustomEvent("anna-overlay-start-press"));
           }}
           onPointerUp={(e) => {
@@ -118,7 +120,6 @@ export default function BottomBar({
             
             const pressDuration = Date.now() - pressStartTimeRef.current;
             if (pressDuration < 350) {
-              // It's a short tap! Cancel background speech overlay and navigate to "Анна на связи"
               window.dispatchEvent(new CustomEvent("anna-overlay-cancel-press"));
               if (onAnnaClick) {
                 onAnnaClick();
@@ -126,7 +127,6 @@ export default function BottomBar({
                 window.dispatchEvent(new CustomEvent("open-anna-screen"));
               }
             } else {
-              // It's a long press release! Submit message to active overlay screen
               window.dispatchEvent(new CustomEvent("anna-overlay-end-press"));
             }
           }}
@@ -144,7 +144,6 @@ export default function BottomBar({
             window.dispatchEvent(new CustomEvent("anna-overlay-cancel-press"));
           }}
           onClick={(e) => {
-            // Prevent additional click interference since we handle tap inside pointer events
             e.preventDefault();
             e.stopPropagation();
           }}
@@ -152,7 +151,6 @@ export default function BottomBar({
             activeTab === "anna" ? "cursor-default" : "hover:scale-[1.04] active:scale-95 cursor-pointer"
           } ${isHolding ? "scale-110" : ""}`}
         >
-          {/* Outer glowing glass protection ring */}
           <div className={`absolute inset-[-6px] rounded-full bg-white border border-gray-100 flex items-center justify-center transition-all ${
             activeTab === "anna" 
               ? "shadow-none" 
@@ -160,13 +158,11 @@ export default function BottomBar({
               ? "shadow-[0_0_20px_rgba(22,181,81,0.4)] border-brand-green-bright/30"
               : "shadow-[0_8px_16px_rgba(16,181,81,0.12)]"
           }`}>
-            {/* Soft secondary overlay ring */}
             {activeTab !== "anna" && (
               <div className="absolute inset-[2px] rounded-full bg-gradient-to-tr from-brand-green-mint/20 to-transparent" />
             )}
           </div>
 
-          {/* Core volumetric green sphere button */}
           <div className={`absolute inset-0 rounded-full flex items-center justify-center overflow-hidden transition-all ${
             activeTab === "anna"
               ? "bg-[#D8ECD9] text-[#789D80] border border-[#CBDCCB]"
@@ -174,26 +170,21 @@ export default function BottomBar({
               ? "bg-gradient-to-b from-brand-green-bright to-brand-green-dark shadow-[inset_0_2px_4px_rgba(0,0,0,0.2),_0_4px_8px_rgba(22,181,81,0.2)]"
               : "bg-gradient-to-b from-brand-green-light through-brand-green-bright to-brand-green-dark shadow-[inset_0_4px_6px_rgba(255,255,255,0.5),_inset_0_-4px_8px_rgba(8,91,36,0.5),_0_6px_14px_rgba(16,181,81,0.35)]"
           }`}>
-            {/* Curved light glazed reflection */}
             {activeTab !== "anna" && (
               <div className="absolute top-1 left-[15%] right-[15%] h-[30%] rounded-full bg-gradient-to-b from-white/60 to-transparent pointer-events-none" />
             )}
             
-            {/* Highlight sparkle */}
             {activeTab !== "anna" && (
               <div className="absolute bottom-1 right-2 w-4 h-4 rounded-full bg-white/10 blur-[1px] pointer-events-none" />
             )}
 
-            {/* Speech bubble icon containing three dots */}
             <div className="relative z-10 flex flex-col gap-1 items-center justify-center scale-110">
               <div className="relative">
-                {/* Custom glowing white message bubble container */}
                 <div className={`w-7 h-6 rounded-[10px] flex items-center justify-center shadow-sm relative after:content-[''] after:absolute after:bottom-[-4px] after:left-[35%] after:w-0 after:h-0 after:border-t-[5px] after:border-x-[4px] after:border-x-transparent ${
                   activeTab === "anna"
                     ? "bg-[#F3F8F4] after:border-t-[#F3F8F4]"
                     : "bg-white after:border-t-white"
                 }`}>
-                  {/* Three friendly voice assistance dots inside */}
                   <div className="flex gap-1 items-center justify-center">
                     <span 
                       className={`w-1 h-1 rounded-full ${
@@ -213,33 +204,39 @@ export default function BottomBar({
         </button>
       </div>
 
-      {/* Item 3: Прогресс */}
+      {/* Item 4: Награды */}
       <button 
-        id="nav-analytics"
+        id="nav-rewards"
         type="button"
-        onClick={onAnalyticsClick}
+        onClick={() => {
+          if (onRewardsClick) {
+            onRewardsClick();
+          } else {
+            window.dispatchEvent(new CustomEvent("open-rewards-screen"));
+          }
+        }}
         className="flex-1 flex flex-col items-center justify-center gap-1 py-0.5 transition-all duration-200 cursor-pointer active:scale-95 text-center"
       >
         <div className={`w-7 h-7 flex items-center justify-center ${
-          activeTab === "progress"
+          activeTab === "rewards"
             ? "text-[#16B551]" 
             : "text-[#737C86] hover:text-brand-green-dark"
         }`}>
-          <BarChart3 className="w-6 h-6 stroke-[1.8]" />
+          <Trophy className="w-6 h-6 stroke-[1.8]" />
         </div>
         <span 
           className={`text-[12px] sm:text-[13px] font-bold leading-none tracking-tight ${
-            activeTab === "progress"
+            activeTab === "rewards"
               ? "text-[#16B551]"
               : "text-[#737C86]"
           }`}
           style={{ fontFamily: '"Calibri", "Candara", sans-serif' }}
         >
-          Прогресс
+          Награды
         </span>
       </button>
 
-      {/* Item 4: Настройки */}
+      {/* Item 5: Настройки */}
       <button 
         id="nav-profile"
         type="button"
@@ -273,7 +270,6 @@ export default function BottomBar({
         </span>
       </button>
 
-      {/* Simulated Home Indicator bar inside our application's viewport bottom area */}
       <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-[5px] bg-[#E2E8F0]/80 rounded-full text-center" />
     </div>
   );

@@ -16,10 +16,10 @@ import {
 import BottomBar from "./BottomBar";
 import CalendarButton from "./CalendarButton";
 import BriefNoteBlock from "./BriefNoteBlock";
+import IngredientCollage from "./IngredientCollage";
 import { MealAnalysisProvider } from "../services/aiLayer";
-import { resolveAvatar } from "../utils/annaAvatarResolver";
-
-const annaAvatarSrc = resolveAvatar({ toneGroup: 'neutral_thoughtful', intent: 'clear_explanation' }).src;
+import { resolveAvatarForCompliance, resolveAvatar } from "../utils/annaAvatarResolver";
+import { checkWFPB } from "../utils/wfpbRules";
 
 interface IngredientCard {
   id: string;
@@ -28,6 +28,7 @@ interface IngredientCard {
   image: string;
   weight?: number;
   status: "green" | "error";
+  manuallyAllowed?: boolean;
 }
 
 interface DishAnalysisScreenProps {
@@ -102,6 +103,25 @@ export default function DishAnalysisScreen({
   const [customTitle, setCustomTitle] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isConfirmed, setIsConfirmed] = useState<boolean>(false);
+  const [aiComment, setAiComment] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!ingredients.length) return;
+    const mapped = ingredients.map(i => ({
+      name: i.shortName || i.fullName,
+      weight: i.weight?.toString() || "100",
+      status: i.status === "error" ? "red" : "green",
+      manuallyAllowed: i.manuallyAllowed,
+    }));
+    fetch("/api/anna-comment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dishName: "", ingredients: mapped }),
+    })
+      .then(r => r.json())
+      .then(data => { if (data.comment) setAiComment(data.comment); })
+      .catch(() => {});
+  }, [ingredients]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -160,75 +180,7 @@ export default function DishAnalysisScreen({
       fat: typeof result.nutrients.fats.value === 'number' ? `${result.nutrients.fats.value} г` : String(result.nutrients.fats.value),
     } : undefined;
 
-    const comment = getAnnaDetailedAdvice().text;
-
-    onConfirm(customTitle || result?.dishName || "Цельное растительное блюдо", computedMacros, comment);
-  };
-
-  const getAnnaDetailedAdvice = () => {
-    let name = "";
-    let isFemale = true;
-    if (typeof window !== "undefined") {
-      name = localStorage.getItem("wfpb_user_name") || "";
-      isFemale = (localStorage.getItem("wfpb_user_gender") || "female") === "female";
-    }
-
-    const hasErrors = ingredients.some(i => i.status === "error");
-    const namePrefix = name ? `${name}, ` : "";
-    
-    const pleasedWord = "рада";
-    const noticedWord = "заметила";
-
-    if (!hasErrors) {
-      return {
-        title: "Анна — Советник WFPB",
-        badge: "Идеально! 🥬",
-        bgColor: "from-[#F0FDF4] to-[#ECFDF5]",
-        borderColor: "border-[#DCFCE7]",
-        text: `${namePrefix}я невероятно ${pleasedWord} за тебя! Твоя тарелочка — это чистый триумф цельного растительного питания без капли добавленного масла и соли. Каждая деталь здесь несёт неоценимую пользу твоим сосудам и клеткам. Киноа и нут поставляют плотный, качественный аминокислотный профиль во главе с лизином, ускоряющим синтез коллагена, а свежие цельные овощи дают прекрасный заряд фолатов (витамина B12 здесь нет, так как это сугубо растительный рацион, но B9 в изобилии) и клетчатки для идеального пищеварения. Твоё тело буквально поёт от лёгкости! Ты на верном пути — продолжай двигаться так же осознанно! 🌟`
-      };
-    } else {
-      // Find prohibited ingredients
-      const nonCompliantParts = ingredients.filter(i => i.status === "error");
-      const badNames = nonCompliantParts.map(i => `«${i.shortName || i.fullName}»`).join(", ");
-
-      const oilIssue = nonCompliantParts.some(i => (i.fullName || i.shortName || "").toLowerCase().includes("масло"));
-      const saltIssue = nonCompliantParts.some(i => {
-        const nameLower = (i.fullName || i.shortName || "").toLowerCase();
-        // Skip beans
-        if (nameLower.includes("фасоль") || nameLower.includes("фасол")) return false;
-        return nameLower.includes("сол") || nameLower.includes("соевый соус") || nameLower.includes("мисо");
-      });
-      const animalIssue = nonCompliantParts.some(i => {
-        const nameLower = (i.fullName || i.shortName || "").toLowerCase();
-        return ["мясо", "говядина", "свинина", "курица", "индейка", "птица", "рыба", "сало", "вечина", "колбаса", "сыр", "молоко", "сливки", "творог", "йогурт", "сметана", "яйц", "яйцо", "яйца", "мед", "мёд", "желатин"].some(keyword => nameLower.includes(keyword));
-      });
-
-      let healthExplanation = "";
-      if (animalIssue) {
-        healthExplanation += "Продукты и дериваты животного происхождения содержат закисляющие белки, насыщенные жиры и холестерин, которые вызывают воспаление сосудистой стенки и перегружают пищеварительный тракт. ";
-      }
-      if (oilIssue) {
-        healthExplanation += "Рафинированные растительные масла — это изолированный стопроцентный жир, полностью лишённый ткани клетчатки. Он склеивает эритроциты в плотные монетные столбики, загущая кровь, после чего эндотелий теряет способность вырабатывать оксид азота для защиты сосудов. ";
-      }
-      if (saltIssue) {
-        healthExplanation += "Добавленная соль и солесодержащие соусы задерживают лишнюю межклеточную жидкость, провоцируя скрытые отёки, спазмируя капилляры и повышая артериальное давление на сердце и почки. ";
-      }
-
-      if (!healthExplanation) {
-        healthExplanation = "Эти нежелательные добавки засоряют микробиом и мешают естественным процессам лизосомального очищения. ";
-      }
-
-      const genderEnding = "заметила";
-
-      return {
-        title: "Анна — Советник WFPB",
-        badge: "Нарушение WFPB ⚠️",
-        bgColor: "from-[#FDF2F2] to-[#FFF5F5]",
-        borderColor: "border-[#FCA5A5]",
-        text: `${namePrefix}я вынуждена прямо констатировать: твое блюдо не соответствует правилам цельного растительного рациона на 100%. Я ${genderEnding} в составе запрещённые ингредиенты: ${badNames}. Это грубое нарушение системы «Всё дело в еде!». ${healthExplanation}Для чистых сосудов и здорового организма такие продукты абсолютно недопустимы. Твоё подтверждение позволяет провести технический анализ, но моя оценка как твоего Советника остаётся отрицательной. Пожалуйста, замени или полностью исключи их!`
-      };
-    }
+    onConfirm(customTitle || result?.dishName || "Цельное растительное блюдо", computedMacros, aiComment || "");
   };
 
   // Run the USDA AI Analysis call with graceful fallback
@@ -321,7 +273,7 @@ export default function DishAnalysisScreen({
       const factor = w / 100;
       const nameLower = ing.fullName.toLowerCase();
 
-      if (ing.status === "error") {
+      if (!checkWFPB(ing.fullName || ing.shortName || "").compliant) {
         hasNonCompliant = true;
       }
 
@@ -533,7 +485,18 @@ export default function DishAnalysisScreen({
 
         {result && (
           <div className="flex flex-col gap-4 mt-2">
-            
+
+            {/* Ingredient Collage (for manually assembled dishes without a photo) */}
+            {ingredients.length > 0 && (
+              <div className="w-full h-36 rounded-[22px] overflow-hidden bg-gray-100 relative">
+                <IngredientCollage
+                  ingredients={ingredients.map((i) => ({ name: i.shortName || i.fullName }))}
+                  containerHeight="h-36"
+                />
+                <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+              </div>
+            )}
+
             {/* CARTOFTE NAMING CONTAINER (Editable) */}
             <div className="bg-white border border-[#EFF2F3] shadow-[0_6px_20px_rgba(43,49,55,0.025)] rounded-[26px] p-4.5 text-center relative overflow-hidden shrink-0">
               {/* Gloss element */}
@@ -746,42 +709,78 @@ export default function DishAnalysisScreen({
               </div>
             </div>
 
-            {/* ANNA'S PRIVATE EXPERT WFPB ANALYZING CARD */}
-            <div className={`bg-gradient-to-r ${getAnnaDetailedAdvice().bgColor} rounded-[26px] p-5.5 flex flex-col gap-4 text-left shadow-[0_8px_24px_rgba(22,181,81,0.035)] relative overflow-hidden`}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-b from-[#10D150]/6 to-transparent rounded-full blur-2xl pointer-events-none" />
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {/* Circular Avatar area of Anna with a tiny green pulse badge */}
-                  <div className="relative shrink-0 select-none">
-                    <div className="w-[48px] h-[48px] rounded-full overflow-hidden shadow-md border border-brand-green-mint/30 relative bg-white">
-                      <img 
-                        src={annaAvatarSrc}
-                        alt="Анна — Советник WFPB" 
-                        className="w-full h-full object-cover"
-                      />
+            {/* ANNA'S PRIVATE EXPERT WFPB ANALYZING CARD — AI-GENERATED */}
+            {(() => {
+              const violationCount = ingredients.filter(i => !checkWFPB(i.fullName || i.shortName || "").compliant).length;
+              const isCompliant = !ingredients.some(i => i.status === "error");
+              const badgeText = isCompliant ? "Идеально! 🥬" : "Нарушение WFPB ⚠️";
+
+              if (!aiComment) {
+                return (
+                  <div className="border border-[#EFF2F3] bg-white rounded-[26px] p-5.5 flex flex-col gap-4 text-left relative overflow-hidden animate-pulse">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-14 h-14 rounded-full bg-gray-200" />
+                        <div className="flex flex-col gap-1.5">
+                          <div className="w-16 h-4 bg-gray-200 rounded" />
+                          <div className="w-24 h-3 bg-gray-200 rounded" />
+                        </div>
+                      </div>
+                      <div className="w-28 h-7 bg-gray-200 rounded-xl" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="w-full h-3.5 bg-gray-200 rounded" />
+                      <div className="w-full h-3.5 bg-gray-200 rounded" />
+                      <div className="w-3/4 h-3.5 bg-gray-200 rounded" />
                     </div>
                   </div>
+                );
+              }
 
-                  <div className="flex flex-col">
-                    <span className="text-[15.5px] text-[#15803D] font-extrabold leading-none">
-                      Анна
-                    </span>
-                    <span className="text-[11px] text-text-muted font-bold mt-0.5 leading-none">
-                      Советник WFPB
+              const avatar = resolveAvatarForCompliance(violationCount, ingredients.length);
+              const isPositive = avatar.toneGroup === "positive" || avatar.toneGroup === "neutral_thoughtful";
+              const borderClass = isPositive ? "border-emerald-200" : "border-rose-200";
+              const shadowStyle = isCompliant ? "0_8px_24px_rgba(22,181,81,0.035)" : "0_8px_24px_rgba(225,29,72,0.06)";
+              const glowStyle = isCompliant ? "from-[#10D150]/6" : "from-[#E11D48]/6";
+              const avatarBorder = isPositive ? "border-emerald-300" : "border-rose-300";
+              const nameColor = isPositive ? "text-[#15803D]" : "text-[#BE123C]";
+              return (
+                <div className={`${isCompliant ? "bg-green-50 border-green-200" : "bg-rose-50 border-rose-200"} border rounded-[26px] p-5.5 flex flex-col gap-4 text-left relative overflow-hidden`} style={{ boxShadow: shadowStyle }}>
+                  <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-b ${glowStyle} to-transparent rounded-full blur-2xl pointer-events-none`} />
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="relative shrink-0 select-none">
+                        <div className={`w-14 h-14 rounded-full overflow-hidden shadow-md border-2 ${avatarBorder} relative bg-white`}>
+                          <img 
+                            src={avatar.src}
+                            alt="Анна — Советник WFPB" 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <span className={`text-[16px] ${nameColor} font-extrabold leading-none`}>
+                          Анна
+                        </span>
+                        <span className="text-[11px] text-text-muted font-bold mt-0.5 leading-none">
+                          Советник WFPB
+                        </span>
+                      </div>
+                    </div>
+
+                    <span className={`px-3 py-1.5 rounded-xl bg-white/80 border text-[11px] font-black text-text-dark shrink-0 shadow-[0_2px_6px_rgba(0,0,0,0.015)] ${borderClass}`}>
+                      {badgeText}
                     </span>
                   </div>
+
+                  <p className="text-[13.5px] sm:text-[14px] text-text-dark font-medium leading-relaxed font-sans">
+                    {aiComment}
+                  </p>
                 </div>
-
-                <span className="px-3 py-1.5 rounded-xl bg-white/80 border border-gray-100 text-[11px] font-black text-text-dark shrink-0 shadow-[0_2px_6px_rgba(0,0,0,0.015)]">
-                  {getAnnaDetailedAdvice().badge}
-                </span>
-              </div>
-
-              <p className="text-[13.5px] sm:text-[14px] text-text-dark font-medium leading-relaxed font-sans">
-                {getAnnaDetailedAdvice().text}
-              </p>
-            </div>
+              );
+            })()}
 
             {/* INTENT-SPECIFIC NUTRITIONAL INSIGHTS */}
             <div className="bg-white border border-[#EFF2F3] shadow-[0_8px_24px_rgba(43,49,55,0.035)] rounded-[26px] p-4 flex flex-col gap-3.5 text-left relative overflow-hidden shrink-0">
@@ -862,8 +861,7 @@ export default function DishAnalysisScreen({
                         fiber: typeof result.nutrients.fiber.value === 'number' ? `${result.nutrients.fiber.value} г` : String(result.nutrients.fiber.value),
                         fat: typeof result.nutrients.fats.value === 'number' ? `${result.nutrients.fats.value} г` : String(result.nutrients.fats.value),
                       } : undefined;
-                      const comment = getAnnaDetailedAdvice().text;
-                      onConfirm(customTitle || result?.dishName || "Цельное растительное блюдо", computedMacros, comment);
+                      onConfirm(customTitle || result?.dishName || "Цельное растительное блюдо", computedMacros, aiComment || "");
                     }}
                   />
                 </div>

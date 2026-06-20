@@ -17,7 +17,9 @@ import {
 } from "lucide-react";
 import BottomBar from "./BottomBar";
 import CalendarButton from "./CalendarButton";
-import { resolveAvatar, resolveAvatarByState } from "../utils/annaAvatarResolver";
+import IngredientCollage from "./IngredientCollage";
+import { resolveAvatar, resolveAvatarForCompliance } from "../utils/annaAvatarResolver";
+import { getSavedDishes } from "../modules/mixer/services/mixerSave";
 
 const annaAvatarSrc = resolveAvatar({ toneGroup: 'positive', intent: 'affirmation' }).src;
 
@@ -27,12 +29,13 @@ export interface SavedDish {
   time: string;
   tag: string;
   category: string;
+  categoryColor?: string;
   image: string;
   isFavorite?: boolean;
   isNew?: boolean;
   dayIndex?: number;
   createdAt: string;
-  ingredients: { name: string; weight: string; status: "green" | "yellow" | "red" }[];
+  ingredients: { name: string; weight: string; status: "green" | "yellow" | "red"; manuallyAllowed?: boolean }[];
   calories: number;
   protein: string;
   fiber: string;
@@ -152,109 +155,6 @@ function getNutrientData(dish: SavedDish): DishReport {
   };
 }
 
-function getAnnaExpertVoice(dish: SavedDish, userName: string, userGender: "female" | "male"): { text: string; isClean: boolean } {
-  const ingredients = dish.ingredients || [];
-  const nameLower = (dish.name || "").toLowerCase();
-  
-  // Look for oil
-  const badOilIngs = ingredients.filter(ing => {
-    const n = (ing.name || "").toLowerCase();
-    return n.includes("масло") || n.includes("олиф") || n.includes("маргарин") || n.includes("майонез") || n.includes("смалец") || n.includes("жир") || (ing.status === "red" && (n.includes("масл") || n.includes("жир")));
-  });
-
-  // Look for salt
-  const badSaltIngs = ingredients.filter(ing => {
-    const n = (ing.name || "").toLowerCase();
-    const isBean = n.includes("фасоль") || n.includes("фасол");
-    const hasSimpleSalt = n.includes("соль") || n.includes("солен") || n.includes("маринад");
-    
-    // Protect beans from simple salt matches
-    const containsSaltActual = isBean 
-      ? (n.includes(" с солью") || n.includes("солёная") || n.includes("соленая")) 
-      : hasSimpleSalt;
-
-    return containsSaltActual || n.includes("соевый соус") || n.includes("мисо") || n.includes("бульонный кубик") || n.includes("глутамат");
-  });
-
-  // Look for animal products
-  const badAnimalIngs = ingredients.filter(ing => {
-    const n = (ing.name || "").toLowerCase();
-    return n.includes("мясо") || n.includes("куриц") || n.includes("птиц") || n.includes("колбас") || n.includes("ветчин") || n.includes("свинин") || n.includes("говядин") || n.includes("рыба") || n.includes("кревет") || n.includes("морепродукт") || n.includes("яйц") || n.includes("сыр") || n.includes("молок") || n.includes("сливк") || n.includes("йогурт") || n.includes("творог") || n.includes("мед") || n.includes("мёд") || n.includes("желатин") || n.includes("сметан") || n.includes("кефир");
-  });
-
-  // Any other red status ingredients
-  const otherRedIngs = ingredients.filter(ing => {
-    const isRed = ing.status === "red";
-    const alreadyListed = badOilIngs.includes(ing) || badSaltIngs.includes(ing) || badAnimalIngs.includes(ing);
-    return isRed && !alreadyListed;
-  });
-
-  const nonCompliantList = [...badOilIngs, ...badSaltIngs, ...badAnimalIngs, ...otherRedIngs];
-  const isClean = nonCompliantList.length === 0;
-
-  const dynamicGreeting = userName ? `Приветствую тебя, ${userName}! ` : "Приветствую! ";
-  const pleasedWord = "рада";
-  const noticedWord = "заметила";
-  const analyzedWord = "проанализировала";
-
-  // Let's retrieve nutrient data to reference in the review
-  const nutrients = getNutrientData(dish);
-  // Find highest vitamin
-  const bestVitamin = [...nutrients.vitamins].sort((a, b) => b.value - a.value)[0];
-  // Find highest mineral
-  const bestMineral = [...nutrients.minerals].sort((a, b) => b.value - a.value)[0];
-
-  if (isClean) {
-    const ingredientsString = ingredients.map(ing => `${ing.name} (${ing.weight})`).join(", ");
-
-    let textOfPraise = `${dynamicGreeting}Я с глубоким профессиональным удовольствием ${analyzedWord} детальный состав твоего блюда «${dish.name}» и пришла в подлинный восторг! Это безупречный образец 100% цельного растительного питания (WFPB).\n\nТвоя порция содержит исключительно чистые, здоровые компоненты: ${ingredientsString}. Общая калорийность порции составляет около ${dish.calories} ккал, при этом она невероятно богата макронутриентами: растительный белок (${dish.protein}), ценнейшая терапевтическая клетчатка (${dish.fiber}) и здоровые липиды (${dish.fat}), поданные природой в своей естественной цельной матрице.\n\nДавай обратим внимание на биохимию микронутриентов. Благодаря гармоничному сочетанию цельных ингредиентов, в блюде зафиксирован мощный спектр нутриентов. Особенно выделяется ${bestVitamin.name}, покрывающий ${bestVitamin.value}% от твоей дневной нормы — это великолепный ресурс для защиты стенок капилляров и обновления клеток. Минеральный профиль также силен: ${bestMineral.name} (${bestMineral.value}% нормы) гарантирует правильный тонус сосудистого русла и стабильную работу миокарда.\n\nКлючевое физиологическое преимущество — полное отсутствие добавленных кулинарных жиров, соли и закисляющих животных белков. Эндотелий твоих сосудов сейчас празднует победу: мембраны эритроцитов не склеиваются в монетные столбики, кислород свободно проникает в ткани, а почки легко поддерживают водно-солевой баланс без задержки жидкости. Это не просто еда, это настоящее лекарство на тарелке! Вдохновляю тебя продолжать этот прекрасный путь оздоровления, каждая такая тарелка — это огромный вклад в твою долгую и активную жизнь! 🌱💚`;
-
-    return { isClean: true, text: textOfPraise };
-  } else {
-    const badNamesAndWeights = nonCompliantList.map(ing => `«${ing.name}» (${ing.weight})`).join(", ");
-    
-    let textOfCritique = `${dynamicGreeting}Я внимательно и с научной точки зрения ${analyzedWord} состав твоего блюда «${dish.name}». К сожалению, вынуждена прямо констатировать: данное блюдо не полностью соответствует строгим принципам цельного растительного рациона (WFPB) и содержит нежелательные отклонения.\n\nВ ходе анализа в порции были обнаружены следующие проблемные ингредиенты: ${badNamesAndWeights}.\n\n`;
-
-    // Scientific, educational, non-toxic, friendly explanations for each bad category
-    if (badAnimalIngs.length > 0) {
-      const names = badAnimalIngs.map(i => `«${i.name}»`).join(", ");
-      textOfCritique += `🚫 **Продукты животного происхождения** (${names}): содержат закисляющие белки, животный холестерин и следы насыщенных жиров. Их расщепление повышает уровень эндотоксинов в кишечнике, провоцирует микровоспаления стенок сосудов и заставляет органы выделения работать с повышенной нагрузкой.\n\n`;
-    }
-
-    if (badOilIngs.length > 0) {
-      const names = badOilIngs.map(i => `«${i.name}»`).join(", ");
-      textOfCritique += `🚫 **Изолированное растительное масло** (${names}): даже холодный отжим лишает продукт защитной растительной клетчатки и превращает его в 100% концентрированный жир. Проникая в кровоток, свободные триглицериды вызывают оцепенение и спазм нежного эндотелия сосудов на 4–6 часов, временно ухудшая микроциркуляцию и транспорт кислорода к тканям.\n\n`;
-    }
-
-    if (badSaltIngs.length > 0) {
-      const names = badSaltIngs.map(i => `«${i.name}»`).join(", ");
-      textOfCritique += `🚫 **Добавленная соль и солесодержащие соусы** (${names}): избыточный натрий блокирует выработку оксида азота, который должен расширять сосуды. Это приводит к спазму стенок капилляров и вынуждает почки удерживать межклеточную воду, создавая отёчность и лишнее давление на сердце.\n\n`;
-    }
-
-    if (otherRedIngs.length > 0) {
-      const names = otherRedIngs.map(i => `«${i.name}»`).join(", ");
-      textOfCritique += `🚫 **Компоненты высокой промышленной переработки** (${names}): содержат рафинированные добавки, нарушающие баланс симбиотной микрофлоры кишечника и перегружающие печень.\n\n`;
-    }
-
-    textOfCritique += `Если взглянуть на цифры анализа, общая ценность порции все же содержит полезные элементы: калорийность равна ${dish.calories} ккал, уровень белков — ${dish.protein}, клетчатки — ${dish.fiber}, а жиров — ${dish.fat}. А заложенный витаминно-минеральный фонд благодаря растительным основам пытается защитить организм: например, ${bestVitamin.name} покрывает ${bestVitamin.value}% суточной нормы, а ${bestMineral.name} — ${bestMineral.value}% нормы. Однако наличие токсичных триггеров сильно нивелирует эту пользу и создаёт дополнительную нагрузку.\n\n`;
-
-    textOfCritique += `💡 **Как сделать это блюдо безупречным в будущем:**\n`;
-    if (badAnimalIngs.length > 0) {
-      textOfCritique += `• Смело замени животную основу сытными растительными белками: отварным нутом, чечевицей белуга, упругими кубиками тофу или темпе. Они насытят тело аминокислотами без воспалительного эффекта.\n`;
-    }
-    if (badOilIngs.length > 0) {
-      textOfCritique += `• Туши и пассируй зажарку исключительно на воде, овощном бульоне без соли или лимонном соке (техника вотер-соте). Для нежной кремовой текстуры добавь пюре из авокадо, ложку семян кунжута или ложку пасты тахини из цельных семян.\n`;
-    }
-    if (badSaltIngs.length > 0) {
-      textOfCritique += `• Полностью исключи солонку. Обогащай букет вкусов натуральными сухими травами, сушёным луком и чесноком, концентрированным сублимированным томатом или пищевыми дезактивированными дрожжами (Nutritional Yeast), которые дают сырно-ореховый оттенок абсолютно без соли!\n`;
-    }
-
-    textOfCritique += `\nПомни, мы учимся каждый день! Наш рацион — это не ограничение, а искусство чистой растительной сборки. Твои вкусовые рецепторы полностью перезагрузятся и очистятся от солевого и жирового плена всего за 5-7 дней. Давай сделаем следующее блюдо на 100% чистым для твоих клеточек! Я верю в твои силы! ✨🌱`;
-
-    return { isClean: false, text: textOfCritique };
-  }
-}
-
 export default function MyDishesScreen({
   onBack,
   savedDishes,
@@ -314,7 +214,8 @@ export default function MyDishesScreen({
   const user_gender = typeof window !== "undefined" ? (localStorage.getItem("wfpb_user_gender") || "female") as "female" | "male" : "female" as "female" | "male";
   
   const nutrientData = selectedDish ? getNutrientData(selectedDish) : null;
-  const annaExpertVoice = selectedDish ? getAnnaExpertVoice(selectedDish, user_name, user_gender) : null;
+  const isClean = selectedDish ? !selectedDish.ingredients.some(ing => ing.status === "red") : true;
+  const violationCount = selectedDish ? selectedDish.ingredients.filter(ing => ing.status === "red").length : 0;
 
   const startEditing = (dish: SavedDish) => {
     setEditingDish(dish);
@@ -322,10 +223,35 @@ export default function MyDishesScreen({
     setCustomCategory("");
   };
 
+  // Merge regular dishes with mixer dishes from localStorage
+  const allDishes = React.useMemo(() => {
+    const mixerDishes = getSavedDishes().map(m => ({
+      id: m.id,
+      name: m.name,
+      time: m.time,
+      tag: m.tag,
+      category: m.category === 'mixer' ? 'Миксер' : m.category,
+      image: m.image || '',
+      isFavorite: false,
+      isNew: false,
+      createdAt: m.time,
+      ingredients: m.ingredients.map(i => ({ name: i.name, weight: '75 г', status: i.status })),
+      calories: m.calories,
+      protein: String(m.protein),
+      fiber: String(m.fiber),
+      fat: String(m.fat),
+      annaTip: m.annaTip,
+      annaComment: m.annaComment,
+    }));
+    const seen = new Set(savedDishes.map(d => d.id));
+    const uniqueMixer = mixerDishes.filter(d => !seen.has(d.id));
+    return [...uniqueMixer, ...savedDishes];
+  }, [savedDishes]);
+
   // Dynamically compute unique categories (WFPB)
   const categories = React.useMemo(() => {
     const uniques = new Set(DEFAULT_CATEGORIES);
-    savedDishes.forEach(dish => {
+    allDishes.forEach(dish => {
       if (dish.category) {
         const norm = dish.category.trim();
         if (norm) {
@@ -335,11 +261,13 @@ export default function MyDishesScreen({
       }
     });
     return Array.from(uniques);
-  }, [savedDishes]);
+  }, [allDishes]);
 
   // Filter based on active category and custom query search
-  const filteredDishes = savedDishes.filter(dish => {
-    const matchesCategory = dish.category.toLowerCase() === activeCategory.toLowerCase();
+  const filteredDishes = allDishes.filter(dish => {
+    const matchesCategory = activeCategory === 'Миксер'
+      ? (dish.category === 'Миксер' || dish.category === 'mixer')
+      : dish.category.toLowerCase() === activeCategory.toLowerCase();
     const matchesSearch = dish.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           dish.tag.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
@@ -582,7 +510,7 @@ export default function MyDishesScreen({
 
       {/* POPUP DETAIL MODAL OVERLAY ON CELL CLICK */}
       <AnimatePresence>
-        {selectedDish && nutrientData && annaExpertVoice && (
+        {selectedDish && nutrientData && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -600,12 +528,19 @@ export default function MyDishesScreen({
             >
               {/* IMAGE HEADER WITH GRADIENT TINT SHADOW AND DISMISS CROSS */}
               <div className="relative h-[240px] w-full bg-gray-50 overflow-hidden shrink-0">
-                <img
-                  src={selectedDish.image}
-                  alt={selectedDish.name}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
+                {selectedDish.image ? (
+                  <img
+                    src={selectedDish.image}
+                    alt={selectedDish.name}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <IngredientCollage
+                    ingredients={selectedDish.ingredients}
+                    containerHeight="h-[240px]"
+                  />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
                 
                 {/* Distinct, high-precision Close Cross Pill Button */}
@@ -649,7 +584,7 @@ export default function MyDishesScreen({
                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-black border border-white/20 bg-white/15 backdrop-blur-xs`}>
                       {selectedDish.tag}
                     </span>
-                    {annaExpertVoice.isClean ? (
+                    {isClean ? (
                       <span className="bg-[#E8F8EE]/90 text-[#15803D] text-[10px] font-black py-1 px-2.5 rounded-full leading-none flex items-center gap-1 shrink-0">
                         🌱 100% WFPB
                       </span>
@@ -769,7 +704,7 @@ export default function MyDishesScreen({
                 </div>
 
                 {/* CHARACTER ANNA'S PRIVATE EXPERT WFPB COACH VIEW */}
-                <div className={`bg-gradient-to-r ${annaExpertVoice.isClean ? "from-[#F0FDF4] to-[#ECFDF5]" : "from-[#FFFDF2] to-[#FFFBE6]"} rounded-[26px] p-5 sm:p-5.5 flex flex-col gap-4 text-left shadow-[0_8px_24px_rgba(22,181,81,0.03)] relative overflow-hidden mb-2`}>
+                <div className={`bg-gradient-to-r ${isClean ? "from-[#F0FDF4] to-[#ECFDF5]" : "from-[#FFFDF2] to-[#FFFBE6]"} rounded-[26px] p-5 sm:p-5.5 flex flex-col gap-4 text-left shadow-[0_8px_24px_rgba(22,181,81,0.03)] relative overflow-hidden mb-2`}>
                   <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-b from-[#10D150]/6 to-transparent rounded-full blur-2xl pointer-events-none" />
                   
                   <div className="flex items-center justify-between">
@@ -778,13 +713,13 @@ export default function MyDishesScreen({
                       <div className="relative shrink-0 select-none">
                         <div className="w-[48px] h-[48px] rounded-full overflow-hidden shadow-md border border-brand-green-mint/30 relative bg-white">
                           <img 
-                            src={resolveAvatarByState("Отвечаю", selectedDish.annaComment || "").src}
+                            src={resolveAvatarForCompliance(violationCount, selectedDish.ingredients.length).src}
                             alt="Анна — Советник WFPB" 
                             className="w-full h-full object-cover"
                           />
                         </div>
-                        <span className={`absolute -bottom-0.5 -right-0.5 w-[15px] h-[15px] rounded-full border border-white flex items-center justify-center text-[8.5px] ${annaExpertVoice.isClean ? "bg-[#10D150]" : "bg-amber-500"}`}>
-                          {annaExpertVoice.isClean ? "🌱" : "💡"}
+                        <span className={`absolute -bottom-0.5 -right-0.5 w-[15px] h-[15px] rounded-full border border-white flex items-center justify-center text-[8.5px] ${isClean ? "bg-[#10D150]" : "bg-amber-500"}`}>
+                          {isClean ? "🌱" : "💡"}
                         </span>
                       </div>
 
@@ -799,12 +734,12 @@ export default function MyDishesScreen({
                     </div>
 
                     <span className="px-3 py-1.5 rounded-xl bg-white/80 border border-gray-100 text-[11px] font-black text-text-dark shrink-0 shadow-[0_2px_6px_rgba(0,0,0,0.015)]">
-                      {annaExpertVoice.isClean ? "Идеально! 🥬" : "Рекомендация 💡"}
+                      {isClean ? "Идеально! 🥬" : "Рекомендация 💡"}
                     </span>
                   </div>
 
                   <div className="text-[13.5px] sm:text-[14px] text-[#2B3137] font-semibold leading-relaxed font-sans space-y-3">
-                    {(selectedDish.annaComment || annaExpertVoice.text).split("\n").map((para, pIdx) => {
+                    {(selectedDish.annaComment || "").split("\n").map((para, pIdx) => {
                       if (!para.trim()) return <div key={pIdx} className="h-2" />;
                       
                       // Convert markdown **text** to <strong> and keep normal text

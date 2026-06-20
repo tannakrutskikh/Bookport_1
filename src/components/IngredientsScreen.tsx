@@ -18,7 +18,8 @@ import {
   Flame,
   Scale
 } from "lucide-react";
-import { getCustomIngredientImage } from "./CheckCompositionScreen";
+import { getIngredientImage } from "../utils/ingredientMapper";
+import { checkWFPB } from "../utils/wfpbRules";
 
 export interface IngredientsScreenProps {
   onBack: () => void;
@@ -39,7 +40,17 @@ const CATEGORIES_DATA: Record<string, DBItem[]> = {
     { fullName: "Фасоль красная", shortName: "Фасоль красная" },
     { fullName: "Фасоль белая", shortName: "Фасоль белая" },
     { fullName: "Горох зелёный", shortName: "Горох зелёный" },
-    { fullName: "Маш", shortName: "Маш" }
+    { fullName: "Маш", shortName: "Маш" },
+    { fullName: "Соевые бобы", shortName: "Соевые бобы" },
+    { fullName: "Темпе", shortName: "Темпе" },
+    { fullName: "Тофу натуральный", shortName: "Тофу" },
+    { fullName: "Фасоль адзуки", shortName: "Фасоль адзуки" },
+    { fullName: "Фасоль лима", shortName: "Фасоль лима" },
+    { fullName: "Фасоль пестрая", shortName: "Фасоль пестрая" },
+    { fullName: "Фасоль черная", shortName: "Фасоль черная" },
+    { fullName: "Чечевица зеленая", shortName: "Чечевица зеленая" },
+    { fullName: "Горошек", shortName: "Горошек" },
+    { fullName: "Фасоль", shortName: "Фасоль" }
   ],
   "Злаки и псевдозлаки": [
     { fullName: "Овсяные хлопья без глютена", shortName: "Овсяные хлопья" },
@@ -50,20 +61,32 @@ const CATEGORIES_DATA: Record<string, DBItem[]> = {
     { fullName: "Рис бурый", shortName: "Рис бурый" },
     { fullName: "Рис чёрный", shortName: "Рис чёрный" },
     { fullName: "Сорго", shortName: "Сорго" },
-    { fullName: "Кукуруза", shortName: "Кукуруза" }
+    { fullName: "Кукуруза", shortName: "Кукуруза" },
+    { fullName: "Булгур", shortName: "Булгур" },
+    { fullName: "Перловка", shortName: "Перловка" },
+    { fullName: "Полба", shortName: "Полба" }
   ],
   "Орехи и кокосовая стружка": [
     { fullName: "Кешью", shortName: "Кешью" },
     { fullName: "Миндаль", shortName: "Миндаль" },
     { fullName: "Грецкие орехи", shortName: "Грецкие орехи" },
-    { fullName: "Кокосовая стружка", shortName: "Кокосовая стружка" }
+    { fullName: "Кокосовая стружка", shortName: "Кокосовая стружка" },
+    { fullName: "Бразильский орех", shortName: "Бразильский орех" },
+    { fullName: "Кедровые орехи", shortName: "Кедровые орехи" },
+    { fullName: "Макадамия", shortName: "Макадамия" },
+    { fullName: "Пекан", shortName: "Пекан" },
+    { fullName: "Фисташки", shortName: "Фисташки" },
+    { fullName: "Фундук", shortName: "Фундук" }
   ],
   "Семена": [
     { fullName: "Лён", shortName: "Лён" },
     { fullName: "Чиа", shortName: "Чиа" },
     { fullName: "Подсолнечник", shortName: "Подсолнечник" },
     { fullName: "Тыквенные семечки", shortName: "Тыквенные семечки" },
-    { fullName: "Кунжут", shortName: "Кунжут" }
+    { fullName: "Кунжут", shortName: "Кунжут" },
+    { fullName: "Конопляные семена", shortName: "Конопляные семена" },
+    { fullName: "Мак", shortName: "Мак" },
+    { fullName: "Семена", shortName: "Семена" }
   ],
   "Специи и сухие ингредиенты": [
     { fullName: "Агар-агар", shortName: "Агар-агар" },
@@ -82,7 +105,21 @@ const CATEGORIES_DATA: Record<string, DBItem[]> = {
     { fullName: "Ваниль", shortName: "Ваниль" },
     { fullName: "Тимьян", shortName: "Тимьян" },
     { fullName: "Лавровый лист", shortName: "Лавровый лист" },
-    { fullName: "Сода", shortName: "Сода" }
+    { fullName: "Сода", shortName: "Сода" },
+    { fullName: "Горчица", shortName: "Горчица" },
+    { fullName: "Зира", shortName: "Зира" },
+    { fullName: "Кленовый сироп", shortName: "Кленовый сироп" },
+    { fullName: "Кокосовый сахар", shortName: "Кокосовый сахар" },
+    { fullName: "Копченая паприка", shortName: "Копченая паприка" },
+    { fullName: "Льняная мука", shortName: "Льняная мука" },
+    { fullName: "Нутрицевтические дрожжи", shortName: "Нутрицевтические дрожжи" },
+    { fullName: "Орегано", shortName: "Орегано" },
+    { fullName: "Розмарин", shortName: "Розмарин" },
+    { fullName: "Соевый соус тамари", shortName: "Соевый соус тамари" },
+    { fullName: "Уксус бальзамический", shortName: "Уксус бальзамический" },
+    { fullName: "Какао", shortName: "Какао" },
+    { fullName: "Мука (тесто)", shortName: "Мука" },
+    { fullName: "Специи", shortName: "Специи" }
   ],
   "Свежие продукты → Овощи": [
     { fullName: "Батат", shortName: "Батат" },
@@ -100,7 +137,27 @@ const CATEGORIES_DATA: Record<string, DBItem[]> = {
     { fullName: "Баклажан", shortName: "Баклажан" },
     { fullName: "Сельдерей", shortName: "Сельдерей" },
     { fullName: "Тыква", shortName: "Тыква" },
-    { fullName: "Авокадо", shortName: "Авокадо" }
+    { fullName: "Авокадо", shortName: "Авокадо" },
+    { fullName: "Артишоки", shortName: "Артишоки" },
+    { fullName: "Брокколи", shortName: "Брокколи" },
+    { fullName: "Дайкон", shortName: "Дайкон" },
+    { fullName: "Кале", shortName: "Кале" },
+    { fullName: "Капуста брюссельская", shortName: "Капуста брюссельская" },
+    { fullName: "Капуста краснокочанная", shortName: "Капуста краснокочанная" },
+    { fullName: "Капуста пекинская", shortName: "Капуста пекинская" },
+    { fullName: "Капуста савойская", shortName: "Капуста савойская" },
+    { fullName: "Картофель", shortName: "Картофель" },
+    { fullName: "Квашеная капуста", shortName: "Квашеная капуста" },
+    { fullName: "Кольраби", shortName: "Кольраби" },
+    { fullName: "Корень куркумы", shortName: "Корень куркумы" },
+    { fullName: "Корень сельдерея", shortName: "Корень сельдерея" },
+    { fullName: "Лук красный", shortName: "Лук красный" },
+    { fullName: "Лук-порей", shortName: "Лук-порей" },
+    { fullName: "Мангольд", shortName: "Мангольд" },
+    { fullName: "Редис", shortName: "Редис" },
+    { fullName: "Редька зеленая", shortName: "Редька зеленая" },
+    { fullName: "Репа", shortName: "Репа" },
+    { fullName: "Цукини", shortName: "Цукини" }
   ],
   "Свежие продукты → Фрукты и ягоды": [
     { fullName: "Яблоки", shortName: "Яблоки" },
@@ -109,7 +166,18 @@ const CATEGORIES_DATA: Record<string, DBItem[]> = {
     { fullName: "Апельсины", shortName: "Апельсины" },
     { fullName: "Лимоны", shortName: "Лимоны" },
     { fullName: "Ягоды", shortName: "Ягоды" },
-    { fullName: "Финики", shortName: "Финики" }
+    { fullName: "Финики", shortName: "Финики" },
+    { fullName: "Абрикосы", shortName: "Абрикосы" },
+    { fullName: "Ананас", shortName: "Ананас" },
+    { fullName: "Гранат", shortName: "Гранат" },
+    { fullName: "Грейпфрут", shortName: "Грейпфрут" },
+    { fullName: "Инжир", shortName: "Инжир" },
+    { fullName: "Киви", shortName: "Киви" },
+    { fullName: "Лайм", shortName: "Лайм" },
+    { fullName: "Манго", shortName: "Манго" },
+    { fullName: "Персики", shortName: "Персики" },
+    { fullName: "Голубика", shortName: "Голубика" },
+    { fullName: "Малина", shortName: "Малина" }
   ],
   "Свежие продукты → Зелень и прочее": [
     { fullName: "Петрушка", shortName: "Петрушка" },
@@ -120,7 +188,14 @@ const CATEGORIES_DATA: Record<string, DBItem[]> = {
     { fullName: "Базилик", shortName: "Базилик" },
     { fullName: "Нори", shortName: "Нори" },
     { fullName: "Шампиньоны", shortName: "Шампиньоны" },
-    { fullName: "Мисо-паста", shortName: "Мисо-паста" }
+    { fullName: "Мисо-паста", shortName: "Мисо-паста" },
+    { fullName: "Кинза", shortName: "Кинза" },
+    { fullName: "Микрозелень любая", shortName: "Микрозелень" },
+    { fullName: "Мята", shortName: "Мята" },
+    { fullName: "Сушеные грибы шиитаке", shortName: "Грибы шиитаке" },
+    { fullName: "Тархун", shortName: "Тархун" },
+    { fullName: "Вода", shortName: "Вода" },
+    { fullName: "Соус", shortName: "Соус" }
   ]
 };
 
@@ -135,37 +210,20 @@ export interface SelectedIngredient {
 }
 
 export function checkIngredientDisallowed(name: string): { disallowed: boolean; reason: string } {
-  const lower = name.toLowerCase().trim();
-  
-  if (!lower) return { disallowed: false, reason: "" };
+  const result = checkWFPB(name);
+  if (result.compliant) return { disallowed: false, reason: "" };
 
-  // 1. Animal products
-  const animalKeywords = [
-    "мясо", "говядин", "свинин", "куриц", "курин", "цыплен", "птиц", "индейк", "уток", "утка",
-    "рыба", "рыб", "лосос", "форел", "тунец", "морепродукт", "креветк", "кальмар", "миди", "краб",
-    "икра", "яйцо", "яйца", "белок", "желток", "молоко", "молоч", "сливки", "сыр", "творог",
-    "йогурт", "кефир", "сметан", "сыворотк", "мед", "мёд", "желатин", "колбас", "ветчин", "сосиск"
-  ];
-  for (const k of animalKeywords) {
-    if (lower.includes(k)) {
-      return { disallowed: true, reason: "ингредиенты животного происхождения" };
-    }
+  const v = result.violations;
+  if (v.some(cat => ['animal', 'fish_seafood', 'dairy', 'egg', 'processed_meat', 'honey'].includes(cat))) {
+    return { disallowed: true, reason: "ингредиенты животного происхождения" };
   }
-
-  // 2. Salt & salt-based products
-  const saltKeywords = ["соль", "солен", "солён", "солт", "соевый соус", "мисо с солью"];
-  const isSaltDetected = saltKeywords.some(k => lower.includes(k));
-  const isBeans = lower.includes("фасоль");
-  if (isSaltDetected && !isBeans) {
-    return { disallowed: true, reason: "содержит добавленную соль" };
-  }
-
-  // 3. Oils
-  if (lower.includes("масло") && !lower.includes("маслин") && !lower.includes("эфирное")) {
+  if (v.includes('refined_oil')) {
     return { disallowed: true, reason: "содержит добавленные масла" };
   }
-
-  return { disallowed: false, reason: "" };
+  if (v.includes('added_salt')) {
+    return { disallowed: true, reason: "содержит добавленную соль" };
+  }
+  return { disallowed: true, reason: "запрещённые компоненты" };
 }
 
 export default function IngredientsScreen({
@@ -240,7 +298,7 @@ export default function IngredientsScreen({
       fullName: weightModalItem.fullName,
       shortName: weightModalItem.shortName,
       weight: weightValue,
-      image: getCustomIngredientImage(weightModalItem.fullName),
+      image: getIngredientImage(weightModalItem.shortName) || getIngredientImage(weightModalItem.fullName) || '',
       status: disallowedCheck.disallowed ? "error" : "green",
       isCustom: weightModalItem.isCustom
     };
@@ -466,30 +524,34 @@ export default function IngredientsScreen({
                       className="overflow-hidden border-t border-gray-100"
                     >
                       <div className="p-4 bg-gray-50/20 flex flex-col gap-3">
-                        <div className="grid grid-cols-2 gap-2.5 max-h-[220px] overflow-y-auto pr-0.5">
-                          {items.map((item) => (
-                            <button
-                              type="button"
-                              key={item.fullName}
-                              onClick={() => handleSelectPredefined(item, catName)}
-                              className="text-left p-3.5 rounded-[18px] bg-white border border-gray-100 hover:border-brand-green-pure/30 active:scale-95 cursor-pointer flex flex-col justify-between aspect-video relative overflow-hidden shadow-xs hover:bg-emerald-50/5 group transition-all"
-                            >
-                              <div className="absolute right-2 top-2 w-8 h-8 rounded-full overflow-hidden border border-gray-100 group-hover:scale-105 transition-transform bg-gray-50 flex items-center justify-center">
-                                <img 
-                                  src={getCustomIngredientImage(item.fullName)} 
-                                  alt={item.shortName} 
-                                  referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <span 
-                                className="text-[13px] font-black text-text-dark tracking-tight mt-auto block leading-tight max-w-[85%]"
-                                style={{ fontFamily: '"Calibri", "Candara", sans-serif' }}
+                        <div className="grid grid-cols-3 gap-y-6 gap-x-4 max-h-[260px] overflow-y-auto pr-0.5">
+                          {items.map((item) => {
+                            const isSelected = selectedIngredients.some(si => si.fullName === item.fullName);
+                            return (
+                              <button
+                                type="button"
+                                key={item.fullName}
+                                onClick={() => handleSelectPredefined(item, catName)}
+                                className={`flex flex-col items-center justify-start cursor-pointer gap-2 relative ${isSelected ? 'drop-shadow-md' : ''}`}
                               >
-                                {item.shortName}
-                              </span>
-                            </button>
-                          ))}
+                                <div className="w-16 h-16 flex items-center justify-center shrink-0">
+                                  <img 
+                                    src={getIngredientImage(item.shortName) || getIngredientImage(item.fullName) || ''} 
+                                    alt={item.shortName} 
+                                    className="w-full h-full object-contain"
+                                  />
+                                </div>
+                                {isSelected && (
+                                  <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-brand-green-pure rounded-full flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-white" />
+                                  </div>
+                                )}
+                                <span className="text-xs md:text-sm font-medium text-center text-gray-800 leading-tight">
+                                  {item.shortName}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
 
                         {/* Prompt-defined mandatory action element: "Ввести свой ингредиент" inside the selection context */}

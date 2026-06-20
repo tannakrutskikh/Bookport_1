@@ -67,6 +67,7 @@ interface MyDayScreenProps {
   setDayNotes: React.Dispatch<React.SetStateAction<Record<number, { text: string; time: string }[]>>>;
   onOpenHabitsTwenty: () => void;
   onOpenWhatIEat: () => void;
+  onOpenRecipes?: () => void;
   onOpenFromWhatIs?: () => void;
   onOpenBookRecipes?: () => void;
   onOpenPurchases?: () => void;
@@ -125,6 +126,7 @@ export default function MyDayScreen({
   setDayNotes,
   onOpenHabitsTwenty,
   onOpenWhatIEat,
+  onOpenRecipes,
   onOpenFromWhatIs,
   onOpenBookRecipes,
   onOpenPurchases,
@@ -2592,6 +2594,7 @@ export default function MyDayScreen({
       <div className="w-full">
         <BottomBar 
           onHomeClick={onBack}
+          onRecipesClick={onOpenRecipes}
           onDiaryClick={onOpenWhatIEat}
           onAnalyticsClick={onOpenHabitsTwenty}
           onAnnaClick={onOpenAnna}

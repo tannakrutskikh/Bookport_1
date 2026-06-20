@@ -15,16 +15,11 @@ import {
 } from "lucide-react";
 import BottomBar from "./BottomBar";
 import CalendarButton from "./CalendarButton";
-
-// Import premium custom generated isolated WFPB assets
-import redLentilsImg from "../assets/images/red_lentils_1780304629489.png";
 import { resolveAvatar } from "../utils/annaAvatarResolver";
+import { getIngredientImage } from "../utils/ingredientMapper";
+import { checkWFPB } from "../utils/wfpbRules";
 
 const annaAvatarSrc = resolveAvatar({ toneGroup: 'reminder_caution', intent: 'caution' }).src;
-import chickpeasImg from "../assets/images/chickpeas_raw_1780304648429.png";
-import avocadoImg from "../assets/images/ripe_avocado_1780304668593.png";
-import spinachImg from "../assets/images/fresh_spinach_1780304688706.png";
-import spicesImg from "../assets/images/mixed_spices_1780304707244.png";
 
 interface CheckCompositionScreenProps {
   onBack: () => void;
@@ -54,194 +49,7 @@ interface IngredientCard {
   manuallyAllowed?: boolean;
 }
 
-// Dynamically resolve high quality visually isolated premium food photos
-export const getCustomIngredientImage = (name: string): string => {
-  const norm = (name || "").toLowerCase().trim();
 
-  // 1. Red Lentils & Chickpeas & Avocado & Spinach first (Our premium custom generated isolated PNGs)
-  if (norm.includes("чечевица красная")) {
-    return redLentilsImg;
-  }
-  if (norm.includes("чечевица коричневая")) {
-    return "https://images.unsplash.com/photo-1515543904379-3d757afe72e2?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("нут")) {
-    return chickpeasImg;
-  }
-  if (norm.includes("авокадо")) {
-    return avocadoImg;
-  }
-  if (norm.includes("шпинат")) {
-    return spinachImg;
-  }
-
-  // 2. Beans & Legumes (Фасоль, горох, маш)
-  if (norm.includes("фасоль красная")) {
-    return "https://images.unsplash.com/photo-1598971861713-54ad16a7e72e?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("фасоль белая")) {
-    return "https://images.unsplash.com/photo-1551745931-a2c3a56e2c91?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("горох")) {
-    return "https://images.unsplash.com/photo-1574316071802-0d684efa7bf5?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("маш")) {
-    return "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?auto=format&fit=crop&q=80&w=300";
-  }
-
-  // 3. Grains & Pseudograins
-  if (norm.includes("овсян")) {
-    return "https://images.unsplash.com/photo-1551462147-37885abb3637?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("киноа")) {
-    return "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("гречка")) {
-    return "https://images.unsplash.com/photo-1599940824399-b87987ceb72a?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("пшено")) {
-    return "https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("рис бурый")) {
-    return "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("рис чёрный") || norm.includes("рис черны")) {
-    return "https://images.unsplash.com/photo-1508061253366-f7da158b6d4f?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("кукуруза")) {
-    return "https://images.unsplash.com/photo-1551754626-78724a643b8a?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("амарант") || norm.includes("сорго")) {
-    return "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?auto=format&fit=crop&q=80&w=300";
-  }
-
-  // 4. Nuts & Seeds (Isolated, professional WFPB close-ups)
-  if (norm.includes("кешью")) {
-    return "https://images.unsplash.com/photo-1536511153552-a08554774843?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("миндаль")) {
-    return "https://images.unsplash.com/photo-1508061253366-f7da158b6d4f?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("грецк")) {
-    return "https://images.unsplash.com/photo-1518563080516-e26515f4cc7f?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("кокос")) {
-    return "https://images.unsplash.com/photo-1543158092-23c2a382e2ba?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("лён") || norm.includes("лен")) {
-    return "https://images.unsplash.com/photo-1508061253366-f7da158b6d4f?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("чиа")) {
-    return "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("тыкв")) {
-    return "https://images.unsplash.com/photo-1607532941433-304659e8198a?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("кунжут")) {
-    return "https://images.unsplash.com/photo-1536511153552-a08554774843?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("подсолнеч")) {
-    return "https://images.unsplash.com/photo-1563865436874-9aef32095ffd?auto=format&fit=crop&q=80&w=300";
-  }
-
-  // 5. Spices and Powders (Turmeric, Ginger, Apple cider, Agar etc. -> our custom generated spicesImg)
-  if (
-    norm.includes("куркум") || 
-    norm.includes("имбир") || 
-    norm.includes("кориц") || 
-    norm.includes("перец") || 
-    norm.includes("кардамон") || 
-    norm.includes("кориандр") || 
-    norm.includes("тмин") || 
-    norm.includes("тимьян") || 
-    norm.includes("лавр") || 
-    norm.includes("уксус") || 
-    norm.includes("агар") || 
-    norm.includes("какао") || 
-    norm.includes("псиллиум") || 
-    norm.includes("ванил") || 
-    norm.includes("сода") ||
-    norm.includes("специи") ||
-    norm.includes("приправ")
-  ) {
-    return spicesImg;
-  }
-
-  // 6. Fresh veggies & fruits (Premium #FFFFFF backdrop or transparent object photography)
-  if (norm.includes("батат")) {
-    return "https://images.unsplash.com/photo-1596003903067-bf5762ad5c17?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("свёкла") || norm.includes("свекла")) {
-    return "https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("капуст")) {
-    return "https://images.unsplash.com/photo-1581078426775-802b857773d1?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("кабачок") || norm.includes("баклажан")) {
-    return "https://images.unsplash.com/photo-1581078426775-802b857773d1?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("морковь")) {
-    return "https://images.unsplash.com/photo-1598170845058-32b996a6bd41?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("лук") || norm.includes("чеснок")) {
-    return "https://images.unsplash.com/photo-1568584711271-e00f13a25068?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("помидор")) {
-    return "https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("огурец") || norm.includes("огурцы")) {
-    return "https://images.unsplash.com/photo-1449300079323-02e209d9d3a6?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("яблок")) {
-    return "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("груш")) {
-    return "https://images.unsplash.com/photo-1514756331096-242fdeb70d4a?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("банан")) {
-    return "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("апельсин")) {
-    return "https://images.unsplash.com/photo-1547514701-42782101795e?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("лимон")) {
-    return "https://images.unsplash.com/photo-1587334206596-f6d8174f85e4?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("ягод")) {
-    return "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("финик")) {
-    return "https://images.unsplash.com/photo-1569870499705-504209102861?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("петрушк") || norm.includes("укроп") || norm.includes("руккол") || norm.includes("зелен") || norm.includes("базилик") || norm.includes("нори")) {
-    return "https://images.unsplash.com/photo-1545241047-6083a3684587?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("шампиньон") || norm.includes("гриб")) {
-    return "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("мисо")) {
-    return "https://images.unsplash.com/photo-1547058886-f6d8174f85e4?auto=format&fit=crop&q=80&w=300";
-  }
-
-  // 7. Danger Animal/Salt warning representation remains standard warning placeholder
-  if (norm.includes("мясо") || norm.includes("говядин") || norm.includes("свин") || norm.includes("кур") || norm.includes("рыб") || norm.includes("яйц")) {
-    return "https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&q=80&w=300";
-  }
-
-  // 8. Custom non-food visual placeholders
-  if (norm.includes("ключ")) {
-    return "https://images.unsplash.com/photo-1582139329536-e7284fece509?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("очк")) {
-    return "https://images.unsplash.com/photo-1511556532299-8f662fc26c06?auto=format&fit=crop&q=80&w=300";
-  }
-  if (norm.includes("чашк") || norm.includes("стакан")) {
-    return "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&q=80&w=300";
-  }
-
-  // Ultimate fallback
-  return "https://images.unsplash.com/photo-1547058886-f6d8174f85e4?auto=format&fit=crop&q=80&w=300";
-};
 
 // Full WFPB non-salt database categories exactly matching user's content
 const INGREDIENTS_DATABASE: Record<string, IngredientOption[]> = {
@@ -252,7 +60,17 @@ const INGREDIENTS_DATABASE: Record<string, IngredientOption[]> = {
     { fullName: "Фасоль красная", shortName: "Фасоль красная", image: "" },
     { fullName: "Фасоль белая", shortName: "Фасоль белая", image: "" },
     { fullName: "Горох зелёный", shortName: "Горох зелёный", image: "" },
-    { fullName: "Маш", shortName: "Маш", image: "" }
+    { fullName: "Маш", shortName: "Маш", image: "" },
+    { fullName: "Соевые бобы", shortName: "Соевые бобы", image: "" },
+    { fullName: "Темпе", shortName: "Темпе", image: "" },
+    { fullName: "Тофу натуральный", shortName: "Тофу", image: "" },
+    { fullName: "Фасоль адзуки", shortName: "Фасоль адзуки", image: "" },
+    { fullName: "Фасоль лима", shortName: "Фасоль лима", image: "" },
+    { fullName: "Фасоль пестрая", shortName: "Фасоль пестрая", image: "" },
+    { fullName: "Фасоль черная", shortName: "Фасоль черная", image: "" },
+    { fullName: "Чечевица зеленая", shortName: "Чечевица зеленая", image: "" },
+    { fullName: "Горошек", shortName: "Горошек", image: "" },
+    { fullName: "Фасоль", shortName: "Фасоль", image: "" }
   ],
   "Злаки и псевдозлаки": [
     { fullName: "Овсяные хлопья", shortName: "Овсяные хлопья", image: "" },
@@ -263,20 +81,32 @@ const INGREDIENTS_DATABASE: Record<string, IngredientOption[]> = {
     { fullName: "Рис бурый", shortName: "Рис бурый", image: "" },
     { fullName: "Рис чёрный", shortName: "Рис чёрный", image: "" },
     { fullName: "Сорго", shortName: "Сорго", image: "" },
-    { fullName: "Кукуруза", shortName: "Кукуруза", image: "" }
+    { fullName: "Кукуруза", shortName: "Кукуруза", image: "" },
+    { fullName: "Булгур", shortName: "Булгур", image: "" },
+    { fullName: "Перловка", shortName: "Перловка", image: "" },
+    { fullName: "Полба", shortName: "Полба", image: "" }
   ],
   "Орехи и кокосовая стружка": [
     { fullName: "Кешью", shortName: "Кешью", image: "" },
     { fullName: "Миндаль", shortName: "Миндаль", image: "" },
     { fullName: "Грецкие орехи", shortName: "Грецкие орехи", image: "" },
-    { fullName: "Кокосовая стружка", shortName: "Кокосовая стружка", image: "" }
+    { fullName: "Кокосовая стружка", shortName: "Кокосовая стружка", image: "" },
+    { fullName: "Бразильский орех", shortName: "Бразильский орех", image: "" },
+    { fullName: "Кедровые орехи", shortName: "Кедровые орехи", image: "" },
+    { fullName: "Макадамия", shortName: "Макадамия", image: "" },
+    { fullName: "Пекан", shortName: "Пекан", image: "" },
+    { fullName: "Фисташки", shortName: "Фисташки", image: "" },
+    { fullName: "Фундук", shortName: "Фундук", image: "" }
   ],
   "Семена": [
     { fullName: "Лён", shortName: "Лён", image: "" },
     { fullName: "Чиа", shortName: "Чиа", image: "" },
     { fullName: "Подсолнечник", shortName: "Подсолнечник", image: "" },
     { fullName: "Тыква", shortName: "Тыква", image: "" },
-    { fullName: "Кунжут", shortName: "Кунжут", image: "" }
+    { fullName: "Кунжут", shortName: "Кунжут", image: "" },
+    { fullName: "Конопляные семена", shortName: "Конопляные семена", image: "" },
+    { fullName: "Мак", shortName: "Мак", image: "" },
+    { fullName: "Семена", shortName: "Семена", image: "" }
   ],
   "Специи и сухие ингредиенты": [
     { fullName: "Агар-агар", shortName: "Агар-агар", image: "" },
@@ -295,7 +125,21 @@ const INGREDIENTS_DATABASE: Record<string, IngredientOption[]> = {
     { fullName: "Ваниль", shortName: "Ваниль", image: "" },
     { fullName: "Тимьян", shortName: "Тимьян", image: "" },
     { fullName: "Лавровый лист", shortName: "Лавровый лист", image: "" },
-    { fullName: "Сода", shortName: "Сода", image: "" }
+    { fullName: "Сода", shortName: "Сода", image: "" },
+    { fullName: "Горчица", shortName: "Горчица", image: "" },
+    { fullName: "Зира", shortName: "Зира", image: "" },
+    { fullName: "Кленовый сироп", shortName: "Кленовый сироп", image: "" },
+    { fullName: "Кокосовый сахар", shortName: "Кокосовый сахар", image: "" },
+    { fullName: "Копченая паприка", shortName: "Копченая паприка", image: "" },
+    { fullName: "Льняная мука", shortName: "Льняная мука", image: "" },
+    { fullName: "Нутрицевтические дрожжи", shortName: "Нутрицевтические дрожжи", image: "" },
+    { fullName: "Орегано", shortName: "Орегано", image: "" },
+    { fullName: "Розмарин", shortName: "Розмарин", image: "" },
+    { fullName: "Соевый соус тамари", shortName: "Соевый соус тамари", image: "" },
+    { fullName: "Уксус бальзамический", shortName: "Уксус бальзамический", image: "" },
+    { fullName: "Какао", shortName: "Какао", image: "" },
+    { fullName: "Мука (тесто)", shortName: "Мука", image: "" },
+    { fullName: "Специи", shortName: "Специи", image: "" }
   ],
   "Свежие продукты": [
     // Подкатегория: Овощи
@@ -315,6 +159,26 @@ const INGREDIENTS_DATABASE: Record<string, IngredientOption[]> = {
     { fullName: "Сельдерей", shortName: "Сельдерей", image: "", subcategory: "Овощи" },
     { fullName: "Тыква", shortName: "Тыква", image: "", subcategory: "Овощи" },
     { fullName: "Авокадо", shortName: "Авокадо", image: "", subcategory: "Овощи" },
+    { fullName: "Артишоки", shortName: "Артишоки", image: "", subcategory: "Овощи" },
+    { fullName: "Брокколи", shortName: "Брокколи", image: "", subcategory: "Овощи" },
+    { fullName: "Дайкон", shortName: "Дайкон", image: "", subcategory: "Овощи" },
+    { fullName: "Кале", shortName: "Кале", image: "", subcategory: "Овощи" },
+    { fullName: "Капуста брюссельская", shortName: "Капуста брюссельская", image: "", subcategory: "Овощи" },
+    { fullName: "Капуста краснокочанная", shortName: "Капуста краснокочанная", image: "", subcategory: "Овощи" },
+    { fullName: "Капуста пекинская", shortName: "Капуста пекинская", image: "", subcategory: "Овощи" },
+    { fullName: "Капуста савойская", shortName: "Капуста савойская", image: "", subcategory: "Овощи" },
+    { fullName: "Картофель", shortName: "Картофель", image: "", subcategory: "Овощи" },
+    { fullName: "Квашеная капуста", shortName: "Квашеная капуста", image: "", subcategory: "Овощи" },
+    { fullName: "Кольраби", shortName: "Кольраби", image: "", subcategory: "Овощи" },
+    { fullName: "Корень куркумы", shortName: "Корень куркумы", image: "", subcategory: "Овощи" },
+    { fullName: "Корень сельдерея", shortName: "Корень сельдерея", image: "", subcategory: "Овощи" },
+    { fullName: "Лук красный", shortName: "Лук красный", image: "", subcategory: "Овощи" },
+    { fullName: "Лук-порей", shortName: "Лук-порей", image: "", subcategory: "Овощи" },
+    { fullName: "Мангольд", shortName: "Мангольд", image: "", subcategory: "Овощи" },
+    { fullName: "Редис", shortName: "Редис", image: "", subcategory: "Овощи" },
+    { fullName: "Редька зеленая", shortName: "Редька зеленая", image: "", subcategory: "Овощи" },
+    { fullName: "Репа", shortName: "Репа", image: "", subcategory: "Овощи" },
+    { fullName: "Цукини", shortName: "Цукини", image: "", subcategory: "Овощи" },
 
     // Подкатегория: Фрукты и ягоды
     { fullName: "Яблоки", shortName: "Яблоки", image: "", subcategory: "Фрукты и ягоды" },
@@ -324,6 +188,17 @@ const INGREDIENTS_DATABASE: Record<string, IngredientOption[]> = {
     { fullName: "Лимоны", shortName: "Лимоны", image: "", subcategory: "Фрукты и ягоды" },
     { fullName: "Ягоды", shortName: "Ягоды", image: "", subcategory: "Фрукты и ягоды" },
     { fullName: "Финики", shortName: "Финики", image: "", subcategory: "Фрукты и ягоды" },
+    { fullName: "Абрикосы", shortName: "Абрикосы", image: "", subcategory: "Фрукты и ягоды" },
+    { fullName: "Ананас", shortName: "Ананас", image: "", subcategory: "Фрукты и ягоды" },
+    { fullName: "Гранат", shortName: "Гранат", image: "", subcategory: "Фрукты и ягоды" },
+    { fullName: "Грейпфрут", shortName: "Грейпфрут", image: "", subcategory: "Фрукты и ягоды" },
+    { fullName: "Инжир", shortName: "Инжир", image: "", subcategory: "Фрукты и ягоды" },
+    { fullName: "Киви", shortName: "Киви", image: "", subcategory: "Фрукты и ягоды" },
+    { fullName: "Лайм", shortName: "Лайм", image: "", subcategory: "Фрукты и ягоды" },
+    { fullName: "Манго", shortName: "Манго", image: "", subcategory: "Фрукты и ягоды" },
+    { fullName: "Персики", shortName: "Персики", image: "", subcategory: "Фрукты и ягоды" },
+    { fullName: "Голубика", shortName: "Голубика", image: "", subcategory: "Фрукты и ягоды" },
+    { fullName: "Малина", shortName: "Малина", image: "", subcategory: "Фрукты и ягоды" },
 
     // Подкатегория: Зелень и прочее
     { fullName: "Петрушка", shortName: "Петрушка", image: "", subcategory: "Зелень и прочее" },
@@ -334,9 +209,16 @@ const INGREDIENTS_DATABASE: Record<string, IngredientOption[]> = {
     { fullName: "Базилик", shortName: "Базилик", image: "", subcategory: "Зелень и прочее" },
     { fullName: "Нори", shortName: "Нори", image: "", subcategory: "Нори // Водоросли" },
     { fullName: "Шампиньоны", shortName: "Шампиньоны", image: "", subcategory: "Грибы" },
-    { fullName: "Мисо-паста", shortName: "Мисо-паста", image: "", subcategory: "Соименитые" }
+    { fullName: "Мисо-паста", shortName: "Мисо-паста", image: "", subcategory: "Соименитые" },
+    { fullName: "Кинза", shortName: "Кинза", image: "", subcategory: "Зелень и прочее" },
+    { fullName: "Микрозелень любая", shortName: "Микрозелень", image: "", subcategory: "Зелень и прочее" },
+    { fullName: "Мята", shortName: "Мята", image: "", subcategory: "Зелень и прочее" },
+    { fullName: "Сушеные грибы шиитаке", shortName: "Грибы шиитаке", image: "", subcategory: "Грибы" },
+    { fullName: "Тархун", shortName: "Тархун", image: "", subcategory: "Зелень и прочее" },
+    { fullName: "Вода", shortName: "Вода", image: "", subcategory: "Зелень и прочее" },
+    { fullName: "Соус", shortName: "Соус", image: "", subcategory: "Зелень и прочее" }
   ]
-};
+ };
 
 // Initial state simulating highly intelligent real-time AI computer vision recognition
 const INITIAL_CARDS: IngredientCard[] = [
@@ -414,58 +296,27 @@ const MOCK_NON_FOOD_CARDS: IngredientCard[] = [
 // Dynamically run programmatic loop to guarantee every catalog item has its custom premium image populated
 INITIAL_CARDS.forEach(c => {
   if (!c.image) {
-    c.image = getCustomIngredientImage(c.shortName || c.fullName);
+    c.image = getIngredientImage(c.shortName || c.fullName) || '';
   }
 });
 
 MOCK_NON_FOOD_CARDS.forEach(c => {
   if (!c.image) {
-    c.image = getCustomIngredientImage(c.shortName || c.fullName);
+    c.image = getIngredientImage(c.shortName || c.fullName) || '';
   }
 });
 
 Object.keys(INGREDIENTS_DATABASE).forEach(category => {
   INGREDIENTS_DATABASE[category].forEach(item => {
     if (!item.image) {
-      item.image = getCustomIngredientImage(item.shortName || item.fullName);
+      item.image = getIngredientImage(item.shortName || item.fullName) || '';
     }
   });
 });
 
 // Checks if the typed or chosen name complies with strict WFPB salt-free, oil-free guidelines
 const checkIsCompliant = (name: string): boolean => {
-  const normalized = name.toLowerCase().trim();
-  
-  // Protect beans "фасоль", "фасоли" from "соль" substring match
-  const isBean = normalized.includes("фасоль") || normalized.includes("фасол");
-  
-  // Let's check for animal food and oils
-  const forbiddenKeywords = [
-    "мясо", "говядина", "свинина", "курица", "индейка", "птица", "рыба", "сало", "вечина", "колбаса",
-    "сыр", "молоко", "сливки", "творог", "йогурт", "сметана", "масло", "олифа", "жир",
-    "яйц", "яйцо", "яйца",
-    "мед", "мёд"
-  ];
-  const hasForbiddenKeyword = forbiddenKeywords.some(keyword => normalized.includes(keyword));
-  if (hasForbiddenKeyword) return false;
-
-  // Now check salt and other salty things, with protection for beans
-  const saltKeywords = ["соевый соус", "бульон", "мисо с солью"];
-  if (saltKeywords.some(keyword => normalized.includes(keyword))) {
-    return false;
-  }
-
-  // Salt sub-parts check: protect beans
-  const hasSaltSub = normalized.includes("соль") || normalized.includes("солен") || normalized.includes("солён");
-  if (hasSaltSub) {
-    if (isBean) {
-      // Beans only violate if they literally state "с солью", "солёная", etc.
-      return normalized.includes(" с солью") || normalized.includes("солёная") || normalized.includes("соленая");
-    }
-    return true;
-  }
-
-  return true;
+  return checkWFPB(name).compliant;
 };
 
 export default function CheckCompositionScreen({
@@ -782,7 +633,7 @@ export default function CheckCompositionScreen({
     );
   }
 
-  const isControlPassed = !cards.some(c => c.status === "error" && !c.manuallyAllowed);
+  const isControlPassed = !cards.some(c => c.status === "error");
 
   return (
     <div className="w-full flex flex-col justify-between min-h-[828px] bg-[#FAFBFB] relative" id="check-composition-screen">
@@ -882,113 +733,81 @@ export default function CheckCompositionScreen({
         </div>
 
         {/* COMPOSITION CARD GRID INCLUDING "+" BUTTON CARD */}
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="grid grid-cols-3 gap-y-6 gap-x-4 mb-5">
           {cards.map((c) => {
             const isSelected = c.id === selectedCardId;
             const isRed = c.status === "error";
             const isBlue = c.status === "blue";
-            
-            // Strictly 3 states: beautiful green (WFPB compliant), beautiful cautionary red (Violations) or blue (Non-food objects)
-            let stateClass = "bg-white border-[#D1E7DD] hover:border-[#16B551]/30 shadow-[0_3px_10px_rgba(43,49,50,0.015)]";
-            if (isRed) {
-              stateClass = "bg-[#FFF5F5] border-[#FCA5A5] text-[#991B1B] shadow-[0_4px_12px_rgba(239,68,68,0.04)]";
-            } else if (isBlue) {
-              stateClass = "bg-[#F0F7FF] border-[#BFDBFE] text-[#1E3A8A] shadow-[0_4px_12px_rgba(59,130,246,0.04)]";
-            } else if (c.weight) {
-              // confirmed green with weight indicator glow
-              stateClass = "bg-white border-[#16B551] shadow-[0_0_12px_3px_rgba(22,181,81,0.08)] bg-gradient-to-b from-white to-[#F2FCF6]";
-            }
+            const hasGreenCheck = (c.weight || c.manuallyAllowed) && !isRed && !isBlue;
 
             const selectionRing = isSelected 
-              ? isBlue
-                ? "ring-2 ring-blue-400 scale-[1.03] shadow-[0_8px_16px_rgba(59,130,246,0.08)]"
-                : "ring-2 ring-emerald-500 scale-[1.03] shadow-[0_8px_16px_rgba(22,181,81,0.06)]"
-              : "hover:scale-[1.01]";
+              ? "ring-2 ring-emerald-500 scale-[1.03]"
+              : "";
+
+            const ingredientImageUrl = getIngredientImage(c.shortName || c.fullName);
 
             return (
               <div
                 key={c.id}
                 onClick={() => setSelectedCardId(c.id)}
-                className={`min-h-[116px] sm:min-h-[120px] rounded-[22px] border p-2 flex flex-col items-center justify-between text-center select-none cursor-pointer transition-all duration-300 relative overflow-hidden ${stateClass} ${selectionRing}`}
+                className={`flex flex-col items-center justify-start gap-1 p-2 cursor-pointer transition-all duration-300 relative ${selectionRing}`}
               >
-                {/* Visual Glass Sheer reflection */}
-                <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/10 pointer-events-none" />
-
-                {/* Status Indicator Icon at absolute top right */}
-                {isRed && !c.manuallyAllowed ? (
-                  <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-600 rounded-full flex items-center justify-center border border-white text-white shadow-sm">
-                    <X className="w-2.5 h-2.5 stroke-[3]" />
+                {/* Status badge at top right */}
+                {isRed ? (
+                  <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-600 rounded-full flex items-center justify-center z-10">
+                    <X className="w-3 h-3 text-white stroke-[3]" />
                   </div>
                 ) : isBlue ? (
-                  <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center border border-white shadow-sm">
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping opacity-75 absolute" />
-                    <div className="w-1.5 h-1.5 bg-white rounded-full relative z-10" />
+                  <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center z-10">
+                    <div className="w-2 h-2 bg-white rounded-full" />
                   </div>
-                ) : (
-                  (c.weight || c.manuallyAllowed) && (
-                    <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-[#16B551] rounded-full flex items-center justify-center border border-white text-white shadow-sm">
-                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                ) : hasGreenCheck ? (
+                  <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-brand-green-pure rounded-full flex items-center justify-center z-10">
+                    <Check className="w-3 h-3 text-white stroke-[3]" />
+                  </div>
+                ) : null}
+
+                {/* Image with status drop-shadow */}
+                <div className={`w-16 h-16 flex items-center justify-center shrink-0 ${
+                  isRed
+                    ? 'drop-shadow-[0_4px_8px_rgba(239,68,68,0.35)]'
+                    : isBlue
+                    ? 'drop-shadow-[0_4px_8px_rgba(59,130,246,0.3)]'
+                    : hasGreenCheck
+                    ? 'drop-shadow-[0_4px_8px_rgba(22,181,81,0.3)]'
+                    : ''
+                }`}>
+                  {ingredientImageUrl ? (
+                    <img 
+                      src={ingredientImageUrl} 
+                      alt={c.shortName} 
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-xl bg-gray-100 flex items-center justify-center">
+                      <span className="text-lg font-bold text-gray-400">{c.shortName?.charAt(0) || '?'}</span>
                     </div>
-                  )
-                )}
-
-                {/* Remove Trash icon on hover/subtle overlay for complete screen control */}
-                <button
-                  type="button"
-                  onClick={(e) => handleRemoveIngredient(c.id, e)}
-                  title="Удалить"
-                  className="absolute bottom-1 right-1 p-1 bg-white hover:bg-red-50 border border-gray-100 rounded-full shadow-sm opacity-0 hover:opacity-100 transition-opacity duration-150 text-gray-400 hover:text-red-600"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-
-                {/* Photo rounded image wrapper */}
-                <div className="w-[45px] h-[45px] rounded-full overflow-hidden bg-white border border-gray-100 shadow-[0_2px_5px_rgba(0,0,0,0.06)] flex items-center justify-center relative shrink-0">
-                  <img 
-                    src={getCustomIngredientImage(c.shortName || c.fullName)} 
-                    alt={c.shortName} 
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover" 
-                  />
-                  {isRed && (
-                    <div className="absolute inset-0 bg-red-500/10 backdrop-blur-[0.5px]" />
-                  )}
-                  {isBlue && (
-                    <div className="absolute inset-0 bg-blue-500/10 backdrop-blur-[0.5px]" />
                   )}
                 </div>
 
                 {/* Text Block */}
-                <div className="flex flex-col items-center justify-center flex-1 w-full mt-2">
-                  <span 
-                    className={`text-[13px] font-black tracking-tight leading-none line-clamp-1 ${
-                      isBlue ? "text-[#1E40AF]" : isRed ? "text-red-700" : "text-[#2B3137]"
-                    }`}
-                    style={{ fontFamily: '"Calibri", sans-serif' }}
-                  >
+                <div className="flex flex-col items-center justify-center w-full">
+                  <span className={`text-xs md:text-sm font-medium text-center leading-tight ${
+                    isRed ? "text-red-600" : "text-gray-800"
+                  }`}>
                     {c.shortName}
                   </span>
                   
-                  {/* Weight under titles. ONLY shows when the user entered/saved weight. */}
+                  {/* Weight display */}
                   {c.weight ? (
-                    <span 
-                      className={`text-[11px] font-extrabold mt-1 tracking-tight ${
-                        isBlue ? "text-[#2563EB]" : "text-[#16B551]"
-                      }`}
-                      style={{ fontFamily: '"Calibri", sans-serif' }}
-                    >
+                    <span className="text-[11px] font-extrabold mt-0.5 text-gray-500">
                       {c.weight} г
                     </span>
                   ) : (
-                    <span 
-                      className={`text-[9.5px] mt-1 block font-semibold hover:underline ${
-                        isRed && !c.manuallyAllowed
-                          ? "text-red-500 animate-pulse" 
-                          : "text-[#A1B0B8]"
-                      }`}
-                      style={{ fontFamily: '"Calibri", sans-serif' }}
-                    >
-                      {isRed && !c.manuallyAllowed ? "заменить ⚠️" : "введите вес"}
+                    <span className={`text-[9.5px] mt-0.5 font-semibold ${
+                      isRed ? "text-red-500 animate-pulse" : "text-gray-400"
+                    }`}>
+                      {isRed ? "заменить ⚠️" : "введите вес"}
                     </span>
                   )}
                 </div>
@@ -1000,19 +819,14 @@ export default function CheckCompositionScreen({
           {!isNonFoodMode && (
             <div
               onClick={() => setSelectedCardId("add-new")}
-              className={`min-h-[116px] sm:min-h-[120px] rounded-[22px] border-2 border-dashed flex flex-col items-center justify-center text-center select-none cursor-pointer transition-all duration-300 hover:scale-[1.02] p-2 ${
+              className={`flex flex-col items-center justify-center gap-1 p-2 cursor-pointer min-h-[100px] rounded-[22px] border-2 border-dashed transition-all duration-300 hover:scale-[1.02] ${
                 selectedCardId === "add-new"
-                  ? "bg-[#ECFDF5] border-[#16B551] text-[#16B551] ring-2 ring-emerald-500 shadow-md"
-                  : "bg-[#F8FAF9] border-[#C2D8C9] text-[#16B551] hover:border-[#16B551] shadow-[inset_0_2px_4px_rgba(0,0,0,0.01)]"
+                  ? "bg-[#ECFDF5] border-[#16B551] text-[#16B551] ring-2 ring-emerald-500"
+                  : "border-[#C2D8C9] text-[#16B551] hover:border-[#16B551]"
               }`}
             >
-              <Plus className="w-7 h-7 stroke-[2.5] mb-1 text-[#16B551]" />
-              <span 
-                className="text-[13px] font-black tracking-tight leading-none"
-                style={{ fontFamily: '"Calibri", sans-serif' }}
-              >
-                Добавить
-              </span>
+              <Plus className="w-7 h-7 stroke-[2.5]" />
+              <span className="text-[13px] font-black">Добавить</span>
             </div>
           )}
         </div>
@@ -1111,7 +925,7 @@ export default function CheckCompositionScreen({
                     <div className="flex items-center gap-2.5 overflow-hidden pr-2">
                       <div className="w-5 h-5 rounded-full overflow-hidden border border-white shadow-sm shrink-0 bg-gray-50 flex items-center justify-center">
                         <img 
-                          src={getCustomIngredientImage(editedShortName || editedFullName)} 
+                          src={getIngredientImage(editedShortName || editedFullName) || ''} 
                           alt="selected" 
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover" 
@@ -1158,7 +972,7 @@ export default function CheckCompositionScreen({
                         >
                           <div className="w-6 h-6 rounded-full overflow-hidden border border-[#EFF2F3] shadow-sm shrink-0 bg-transparent flex items-center justify-center">
                             <img 
-                              src={getCustomIngredientImage(opt.shortName || opt.fullName)} 
+                              src={getIngredientImage(opt.shortName || opt.fullName) || ''} 
                               alt={opt.shortName} 
                               referrerPolicy="no-referrer"
                               className="w-full h-full object-cover" 

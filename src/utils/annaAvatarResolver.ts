@@ -204,8 +204,11 @@ const textKeywordMap: Array<{ keywords: string[]; toneGroup: ToneGroup; intent: 
   { keywords: ['внимание', 'всмотрись', 'приглядись', 'изучи'], toneGroup: 'neutral_thoughtful', intent: 'scrutinizing' },
   { keywords: ['представь', 'вообрази себе', 'а если'], toneGroup: 'neutral_thoughtful', intent: 'fantasizing' },
 
+  // ── positive: Anna's analysis approval (before general negative to avoid false positives) ──
+  { keywords: ['наконец-то', 'приятно видеть', 'лучший способ', 'редкий случай', 'чистоту сосудов'], toneGroup: 'positive', intent: 'joy_user_success' },
+
   // ── negative: displeasure, denial, offense ──
-  { keywords: ['нет', 'неправ', 'не согласен', 'отказ', 'не буду'], toneGroup: 'negative_displeasure', intent: 'denial' },
+  { keywords: ['неправ', 'не согласен', 'отказ', 'не буду'], toneGroup: 'negative_displeasure', intent: 'denial' },
   { keywords: ['ни за что', 'никогда', 'исключено', 'запрети'], toneGroup: 'negative_displeasure', intent: 'denial_and_prohibitions' },
   { keywords: ['обидно', 'обидела', 'грустно', 'жаль', 'жалко'], toneGroup: 'negative_displeasure', intent: 'offense' },
   { keywords: ['возмущён', 'негодую', 'как так'], toneGroup: 'negative_displeasure', intent: 'offense_and_anger' },
@@ -240,20 +243,77 @@ const textKeywordMap: Array<{ keywords: string[]; toneGroup: ToneGroup; intent: 
   { keywords: ['внимательно', 'осторожно', 'аккуратно', 'бережно'], toneGroup: 'reminder_caution', intent: 'caution' },
   { keywords: ['очень важно', 'критично', 'срочно', 'внимание'], toneGroup: 'reminder_caution', intent: 'important_reminder' },
   { keywords: ['предупреждаю', 'серьёзно', 'последствия'], toneGroup: 'reminder_caution', intent: 'serious_reminder_warning' },
+  // ── full emotional spectrum for Archive modal ──
+  { keywords: ['триумф', 'идеально', 'рада за тебя', 'чистый триумф', 'верном пути', 'на верном пути'], toneGroup: 'positive', intent: 'joy_user_success' },
+  { keywords: ['горжусь', 'молодец', 'отлично', 'прекрасно', 'великолепно'], toneGroup: 'positive', intent: 'affirmation' },
+  { keywords: ['бальзамируешь', 'пытаешься притвориться', 'тараканы океана', 'слизь', 'сладко-кисло'], toneGroup: 'mockery_sarcasm', intent: 'mockery' },
+  { keywords: ['гениально'], toneGroup: 'mockery_sarcasm', intent: 'condescension' },
+  { keywords: ['осторожнее', 'замени', 'замени или полностью', 'инсулиновые качели', 'инсулиновый скачок', 'нагрузка на'], toneGroup: 'reminder_caution', intent: 'serious_reminder_warning' },
+  { keywords: ['опять', 'свёл на нет', 'свел на нет', 'разочарована', 'пустые калории', 'пустые углеводы'], toneGroup: 'negative_displeasure', intent: 'disappointment' },
+  { keywords: ['трансжир', 'трансжиры', 'запрещенные', 'запрещённые', 'недопустимо', 'сало', 'бекон'], toneGroup: 'negative_displeasure', intent: 'irritation_and_anger' },
+  // ── Anna's dish analysis (client-side getAnnaDetailedAdvice) ──
+  { keywords: ['чистый триумф', 'невероятно рада за тебя', 'тело буквально поёт', 'на верном пути'], toneGroup: 'positive', intent: 'joy_user_success' },
+  { keywords: ['грубое нарушение', 'не соответствует правилам', 'запрещённые ингредиенты', 'абсолютно недопустимы', 'остаётся отрицательной'], toneGroup: 'negative_displeasure', intent: 'disappointment' },
+  { keywords: ['говядина', 'курица', 'лосось', 'свинина', 'колбаса', 'сыр', 'молоко', 'яйцо', 'рыба'], toneGroup: 'negative_displeasure', intent: 'irritation_and_anger' },
+  { keywords: ['исключи их', 'замени или полностью', 'вынуждена прямо констатировать'], toneGroup: 'reminder_caution', intent: 'important_reminder' },
+  // ── reaction matrix keywords (Anna's dish analysis) ──
+  { keywords: ['канцероген', 'группа 1', 'нитрит натрия', 'бальзамирует', 'консервант'], toneGroup: 'negative_displeasure', intent: 'irritation_and_anger' },
+  { keywords: ['igf-1', 'фактор роста', 'tmao', 'разрушает сосуды', 'нагрузка на почки'], toneGroup: 'negative_displeasure', intent: 'irritation_and_anger' },
+  { keywords: ['казоморфин', 'эстроген', 'соматические клетки', 'гной', 'концентрированный шар'], toneGroup: 'negative_displeasure', intent: 'disappointment_and_dissatisfaction' },
+  { keywords: ['инсулиновый скачок', 'гликация', 'старение', 'патогенная микрофлора', 'цементирует ворсинки'], toneGroup: 'negative_displeasure', intent: 'disappointment_and_dissatisfaction' },
+  { keywords: ['трансжир', 'эндотелий', 'токсичная бомба', 'майонез', 'рафинированный жир'], toneGroup: 'negative_displeasure', intent: 'offense_and_anger' },
+  { keywords: ['микропластик', 'тяжёлый металл', 'ртуть', 'океанский таракан', 'фильтрует мусор'], toneGroup: 'mockery_sarcasm', intent: 'mockery' },
+  { keywords: ['нейротоксин', 'обезвоживание', 'разрушение мозга', 'алкоголь', 'пиво'], toneGroup: 'negative_displeasure', intent: 'anger' },
+  { keywords: ['токсичный коктейль', 'биологический мусор', 'сосуд', 'воспаление', 'рассыпаться раньше времени'], toneGroup: 'negative_displeasure', intent: 'irritation_and_anger' },
 ]
 
-export function resolveAvatarByState(state: string, textContext?: string): AvatarResult {
+const WFPB_NEGATIVE_GROUPS: ToneGroup[] = ['negative_displeasure', 'mockery_sarcasm', 'surprise_fear', 'reminder_caution']
+const WFPB_POSITIVE_GROUPS: ToneGroup[] = ['positive', 'neutral_thoughtful']
+
+const wfpbNegativeSeries: AvatarSeries[] = WFPB_NEGATIVE_GROUPS.flatMap(tg => avatarManifest.groups[tg])
+const wfpbPositiveSeries: AvatarSeries[] = WFPB_POSITIVE_GROUPS.flatMap(tg => avatarManifest.groups[tg])
+
+let wfpbAvatarCounter = 0
+
+export function resolveAvatarForCompliance(violationCount: number, totalCount: number): AvatarResult {
+  wfpbAvatarCounter++
+  const level = clampIntensity(violationCount > 0 ? violationCount : ((wfpbAvatarCounter % 6) + 1))
+
+  if (violationCount > 0) {
+    const idx = (wfpbAvatarCounter - 1) % wfpbNegativeSeries.length
+    const series = wfpbNegativeSeries[idx]
+    return {
+      key: series.key,
+      src: `/src/assets/images/anna/${series.key}/${level}.png`,
+      level,
+      toneGroup: series.toneGroup as ToneGroup,
+      description: series.description,
+    }
+  }
+
+  const idx = (wfpbAvatarCounter - 1) % wfpbPositiveSeries.length
+  const series = wfpbPositiveSeries[idx]
+  return {
+    key: series.key,
+    src: `/src/assets/images/anna/${series.key}/${level}.png`,
+    level,
+    toneGroup: series.toneGroup as ToneGroup,
+    description: series.description,
+  }
+}
+
+export function resolveAvatarByState(state: string, textContext?: string, intensity?: number): AvatarResult {
   if (textContext) {
     const lower = textContext.toLowerCase()
     for (const rule of textKeywordMap) {
       if (rule.keywords.some(kw => lower.includes(kw))) {
-        return resolveAvatar({ toneGroup: rule.toneGroup, intent: rule.intent })
+        return resolveAvatar({ toneGroup: rule.toneGroup, intent: rule.intent, intensity })
       }
     }
   }
   const mapping = stateIntentMap[state]
   if (mapping) {
-    return resolveAvatar({ toneGroup: mapping.toneGroup, intent: mapping.intent })
+    return resolveAvatar({ toneGroup: mapping.toneGroup, intent: mapping.intent, intensity })
   }
-  return resolveGeneralAvatar()
+  return resolveAvatar({ ...generalAvatar, intensity: intensity ?? generalAvatar.intensity })
 }
