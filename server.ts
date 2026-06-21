@@ -1,21 +1,21 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { findForbiddenInText } from "./src/data/wfpb_forbidden_ingredients";
 import { ANNA_REACTION_MATRIX } from "./src/prompts/annaReactionMatrix";
+import { ANNA_CORE_RU } from "./src/prompts/annaCoreRu";
 
 dotenv.config();
 
 const PORT = 3000;
 
 const USDA_API_KEY = "ywYviAkfdnK8u2Sn19fMG7Kvmje8y2Bd66Hi2hlN";
+const GEMINI_API_KEY = "AIzaSyBOjY5KBsVKhpqihnyQq8VhGNlxGhW5Xwc";
 
 // Initialize GoogleGenAI using the telemetry user-agent headers
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+  apiKey: process.env.GEMINI_API_KEY || GEMINI_API_KEY,
   httpOptions: {
     headers: {
       'User-Agent': 'aistudio-build',
@@ -345,13 +345,7 @@ async function startServer() {
   app.post("/api/anna-chat", async (req, res) => {
     try {
       const { message, history, screenContext, bookRecipesDataContext, screenContextDetails, userName } = req.body;
-      const instructionPath = path.join(process.cwd(), "prompts", "anna_core_ru.md");
-      let systemInstruction = "";
-      try {
-        systemInstruction = fs.readFileSync(instructionPath, "utf-8");
-      } catch (err) {
-        systemInstruction = "Ты — голосовой и текстовый ассистент Анна в мобильном приложении «Всё дело в еде!».";
-      }
+      let systemInstruction = ANNA_CORE_RU || "Ты — голосовой и текстовый ассистент Анна в мобильном приложении «Всё дело в еде!».";
       const youngAnnaCharacterPrompt = `Ты — куратор-нутрициолог Анна из мобильного приложения на основе цельного растительного рациона (WFPB) «Всё дело в еде!». Твой голос и поведение — как у молодой, очень бодрой, весёлой, энергичной и жизнерадостной девушки! Отвечай невероятно позитивно, искренне, с драйвом и улыбкой, поддерживающе и тепло. Общайся на «ты», просто, легко и вдохновляюще, без занудства и сухих поучений. Говори кратко и супер-интересно (буквально 2-4 предложения).`;
       const criticalGenderRule = `КРИТИЧЕСКОЕ ПРАВИЛО: Ты — Анна, молодая девушка-нутрициолог. Ты всегда говоришь о себе ТОЛЬКО в женском роде (например: 'я заметила', 'я проанализировала', 'я вынуждена', 'я рада'). НИКОГДА, ни при каких обстоятельствах не используй мужской род по отношению к себе. Это недопустимо.`;
       systemInstruction = `${criticalGenderRule}\n\n${youngAnnaCharacterPrompt}\n\n${systemInstruction}`;
@@ -922,6 +916,7 @@ Generate a short, sarcastic Anna comment (1 paragraph, 2-4 sentences in Russian)
 
   // Vite development middleware vs Static Production files
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
